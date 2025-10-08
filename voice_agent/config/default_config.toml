@@ -1,0 +1,61 @@
+active_profile = "default"
+
+[profiles.default]
+asr_backend = "faster-whisper"
+asr_model = "assets/asr/faster-whisper-base"
+asr_device = "cpu"
+
+llm_backend = "llama-cpp"
+llm_model = "assets/llm/LiquidAI/LFM2-350M-GGUF/LFM2-350M-Q4_K_M.gguf"
+llm_context_window = 2048
+llm_temperature = 0.7
+llm_top_p = 0.9
+llm_repeat_penalty = 1.1
+
+vad_model = "assets/vad/silero_vad.jit"
+vad_trigger_level = 0.5
+vad_release_level = 0.35
+vad_sensitivity = 0.6
+
+turn_min_utterance_ms = 600
+turn_max_silence_ms = 700
+turn_max_turn_ms = 15000
+turn_barge_in = true
+
+[profiles.default.tts]
+backend = "kitten"
+voice_id = "kitten/en_female_01"
+model_dir = "assets/tts/kitten-tts"
+chunk_min_chars = 40
+chunk_min_ms = 600
+chunk_max_gap_ms = 280
+
+[profiles.fast-mlx]
+asr_backend = "mlx-whisper"
+asr_model = "assets/asr/mlx-whisper-small"
+asr_device = "mps"
+
+llm_backend = "llama-cpp"
+llm_model = "assets/llm/LiquidAI/LFM2-700M-GGUF/LFM2-700M-Q4_K_M.gguf"
+llm_context_window = 2048
+llm_temperature = 0.8
+llm_top_p = 0.9
+llm_repeat_penalty = 1.05
+
+vad_model = "assets/vad/silero_vad.jit"
+vad_trigger_level = 0.55
+vad_release_level = 0.3
+vad_sensitivity = 0.5
+
+turn_min_utterance_ms = 800
+turn_max_silence_ms = 650
+turn_max_turn_ms = 12000
+turn_barge_in = true
+
+[profiles.fast-mlx.tts]
+backend = "kitten"
+voice_id = "kitten/en_female_02"
+model_dir = "assets/tts/kitten-tts"
+chunk_min_chars = 30
+chunk_min_ms = 500
+chunk_max_gap_ms = 220
