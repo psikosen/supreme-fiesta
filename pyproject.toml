@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "voice-agent"
+version = "0.1.0"
+description = "Cross-platform voice agent runtime with ASR, LLM, and TTS orchestration"
+authors = ["Voice Agent Team <team@example.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [{ include = "voice_agent" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+typer = { version = "^0.9.0", extras = ["all"] }
+sounddevice = "^0.4.6"
+numpy = "^1.26.0"
+requests = "^2.31.0"
+pydantic = "^2.7.0"
+platformdirs = "^4.2.0"
+rich = "^13.7.0"
+onnxruntime = { version = "^1.17.0", optional = true }
+pyaudio = { version = "^0.2.14", optional = true }
+scipy = "^1.12.0"
+tomli-w = "^1.0.0"
+
+[tool.poetry.extras]
+tts = ["onnxruntime"]
+audio = ["pyaudio"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.0"
+pytest-mock = "^3.12.0"
+ruff = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core>=1.8.1"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["voice_agent"]
