@@ -16,6 +16,7 @@ from voice_agent.cli.visualizer import DotsVisualizer
 from voice_agent.config import ConfigManager
 from voice_agent.logging import configure_logging, get_logger
 from voice_agent.tts import KittenTTS, load_voice_inventory
+from voice_agent.vad import SileroVadError, SileroVadStream
 
 app = typer.Typer(add_completion=False, help="Cross-platform voice agent runtime")
 profile_app = typer.Typer(help="Manage configuration profiles")
@@ -52,11 +53,47 @@ def run(
     """Run an audio loopback demo with the dot visualizer."""
 
     manager = _config_manager(config_path)
-    manager.load()
+    config = manager.load()
     audio = AudioIO(samplerate=16000)
     visualizer = DotsVisualizer()
     data = audio.record_loopback(seconds=seconds, input_device=input_device, output_device=output_device)
-    visualizer.run_demo(data)
+    profile = config.active()
+    vad_model_path = profile.vad.model_path.expanduser()
+    try:
+        vad_stream = SileroVadStream.from_numpy(
+            audio=data,
+            model_path=vad_model_path,
+            sample_rate=audio.samplerate,
+            trigger_level=profile.vad.trigger_level,
+            release_level=profile.vad.release_level,
+            sensitivity=profile.vad.sensitivity,
+        )
+    except FileNotFoundError as exc:
+        _LOG.warning(
+            "VAD model missing",
+            extra={
+                "classname": "CLI",
+                "function": "run",
+                "system_section": "vad",
+                "error": str(exc),
+                "message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+            },
+        )
+        visualizer.run_demo(data)
+    except SileroVadError as exc:
+        _LOG.error(
+            "VAD initialisation failed",
+            extra={
+                "classname": "CLI",
+                "function": "run",
+                "system_section": "vad",
+                "error": str(exc),
+                "message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+            },
+        )
+        visualizer.run_demo(data)
+    else:
+        visualizer.render_vad(vad_stream, fallback_audio=data)
     typer.echo("Loopback complete")
 
 

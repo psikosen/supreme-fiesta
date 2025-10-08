@@ -12,7 +12,7 @@ llm_temperature = 0.7
 llm_top_p = 0.9
 llm_repeat_penalty = 1.1
 
-vad_model = "assets/vad/silero_vad.jit"
+vad_model = "assets/vad/silero_vad.onnx"
 vad_trigger_level = 0.5
 vad_release_level = 0.35
 vad_sensitivity = 0.6
@@ -42,7 +42,7 @@ llm_temperature = 0.8
 llm_top_p = 0.9
 llm_repeat_penalty = 1.05
 
-vad_model = "assets/vad/silero_vad.jit"
+vad_model = "assets/vad/silero_vad.onnx"
 vad_trigger_level = 0.55
 vad_release_level = 0.3
 vad_sensitivity = 0.5
