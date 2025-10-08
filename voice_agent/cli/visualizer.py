@@ -10,6 +10,7 @@ from typing import Iterable
 
 import numpy as np
 
+from voice_agent.vad import VadEvent, VadState
 
 @dataclass
 class VisualizerConfig:
@@ -42,6 +43,28 @@ class DotsVisualizer:
             sys.stdout.write(f"[{state:>8}] {bar}\n")
             sys.stdout.flush()
             time.sleep(self.config.refresh_rate)
+
+    def render_vad(self, events: Iterable[VadEvent], fallback_audio: np.ndarray | None = None) -> None:
+        sys.stdout.write("VAD State:\n")
+        sys.stdout.flush()
+        last_timestamp = 0.0
+        last_state = VadState.SILENCE
+        count = 0
+        for event in events:
+            count += 1
+            last_timestamp = event.timestamp
+            last_state = event.state
+            bar = "█" * min(10, int(round(event.confidence * 10)))
+            sys.stdout.write(
+                f"[{event.state.value:>7}] {bar:<10} @ {event.timestamp:5.2f}s\n"
+            )
+            sys.stdout.flush()
+            time.sleep(self.config.refresh_rate)
+        if count == 0 and fallback_audio is not None:
+            self.render_audio(fallback_audio)
+        elif count and last_state is not VadState.SILENCE:  # ensure terminal silence marker
+            sys.stdout.write(f"[{VadState.SILENCE.value:>7}] {'':10} @ {last_timestamp:5.2f}s\n")
+            sys.stdout.flush()
 
     def render_tokens(self, token_stream: Iterable[str], duration: float = 0.5) -> None:
         sys.stdout.write("LLM Tokens:\n")
