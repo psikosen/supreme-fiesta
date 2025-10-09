@@ -8,7 +8,7 @@
 - [x] Add bootstrap script for macOS/Linux including model downloads.
 - [x] Implement Silero VAD streaming integration.
 - [x] Integrate MLX Whisper and Faster-Whisper ASR backends.
-- [ ] Add llama.cpp GGUF streaming inference runner.
+- [x] Add llama.cpp GGUF streaming inference runner.
 - [ ] Implement Smart-Turn v2 orchestration and unit tests.
 - [ ] Build benchmarking tools for LLM, ASR, and TTS latency.
 - [ ] Extend packaging and telemetry features.
