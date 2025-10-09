@@ -6,18 +6,25 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 import requests
 import typer
 
+from voice_agent.benchmarks import (
+    make_silence,
+    measure_asr_latency,
+    measure_llm_latency,
+    measure_tts_latency,
+)
 from voice_agent.asr import AsrEvent, create_asr_engine
 from voice_agent.audio import AudioIO
 from voice_agent.cli.visualizer import DotsVisualizer
 from voice_agent.config import ConfigManager
 from voice_agent.llm import LlmConfig as RuntimeLlmConfig, create_llm_engine
 from voice_agent.logging import configure_logging, get_logger
+from voice_agent.telemetry import TelemetryClient
 from voice_agent.tts import KittenTTS, load_voice_inventory
 from voice_agent.vad import SileroVadError, SileroVadStream
 
@@ -306,15 +313,87 @@ def models_pull(
 def bench_latency(
     config_path: Optional[Path] = typer.Option(None, "--config-path", help="Override configuration path"),
 ) -> None:
-    """Run a lightweight latency probe for audio loopback."""
+    """Run latency probes for audio loopback, ASR, LLM, and TTS."""
 
     manager = _config_manager(config_path)
-    manager.load()
+    config = manager.load()
+    profile = config.active()
+    telemetry = TelemetryClient()
+    metrics: Dict[str, object] = {}
+
     audio = AudioIO(samplerate=16000)
     start = time.perf_counter()
     audio.record_loopback(seconds=1.0)
-    duration = time.perf_counter() - start
-    typer.echo(json.dumps({"loopback_seconds": duration}, indent=2))
+    metrics["audio_loopback_seconds"] = time.perf_counter() - start
+
+    try:
+        asr_engine = create_asr_engine(profile.asr)
+    except Exception as exc:  # pragma: no cover - backend optional
+        _LOG.error(
+            "ASR benchmark setup failed",
+            extra={
+                "classname": "CLI",
+                "function": "bench_latency",
+                "system_section": "asr",
+                "error": str(exc),
+                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise ASR backend",
+            },
+        )
+        metrics["asr"] = {"error": str(exc)}
+    else:
+        asr_result = measure_asr_latency(asr_engine, make_silence(1.0, audio.samplerate), telemetry=telemetry)
+        metrics["asr"] = asr_result.metrics
+
+    runtime_config = RuntimeLlmConfig(
+        model_path=profile.llm.model_path,
+        temperature=profile.llm.temperature,
+        top_p=profile.llm.top_p,
+        repeat_penalty=profile.llm.repeat_penalty,
+        context_window=profile.llm.context_window,
+    )
+
+    try:
+        llm_engine = create_llm_engine(runtime_config)
+    except Exception as exc:  # pragma: no cover - backend optional
+        _LOG.error(
+            "LLM benchmark setup failed",
+            extra={
+                "classname": "CLI",
+                "function": "bench_latency",
+                "system_section": "llm",
+                "error": str(exc),
+                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise LLM backend",
+            },
+        )
+        metrics["llm"] = {"error": str(exc)}
+    else:
+        llm_result = measure_llm_latency(llm_engine, "Benchmark prompt", max_tokens=32, telemetry=telemetry)
+        metrics["llm"] = llm_result.metrics
+
+    try:
+        tts_engine = KittenTTS(profile.tts.model_dir, profile.tts.voice_id)
+    except Exception as exc:  # pragma: no cover - backend optional
+        _LOG.error(
+            "TTS benchmark setup failed",
+            extra={
+                "classname": "CLI",
+                "function": "bench_latency",
+                "system_section": "tts",
+                "error": str(exc),
+                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise TTS backend",
+            },
+        )
+        metrics["tts"] = {"error": str(exc)}
+    else:
+        chunk_cfg = {
+            "chunk_min_chars": profile.tts.chunk_min_chars,
+            "chunk_min_ms": profile.tts.chunk_min_ms,
+            "chunk_max_gap_ms": profile.tts.chunk_max_gap_ms,
+        }
+        tts_result = measure_tts_latency(tts_engine, "Benchmarking latency", chunk_cfg, telemetry=telemetry)
+        metrics["tts"] = tts_result.metrics
+
+    typer.echo(json.dumps(metrics, indent=2, sort_keys=True))
 
 
 def _download_file(url: str, target: Path) -> None:
