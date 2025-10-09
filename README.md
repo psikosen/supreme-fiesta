@@ -19,6 +19,7 @@ A cross-platform (Linux + macOS) voice agent runtime that orchestrates audio I/O
 - Python 3.11 or 3.12
 - `sounddevice` requirements (PortAudio installed on the system)
 - Optional: `onnxruntime` (CPU) for Kitten TTS inference
+- Optional: `faster-whisper`/`mlx-whisper` for ASR backends (`poetry install --extras asr`)
 
 ### Bootstrap
 

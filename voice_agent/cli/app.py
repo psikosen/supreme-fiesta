@@ -8,9 +8,11 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import requests
 import typer
 
+from voice_agent.asr import AsrEvent, create_asr_engine
 from voice_agent.audio import AudioIO
 from voice_agent.cli.visualizer import DotsVisualizer
 from voice_agent.config import ConfigManager
@@ -94,6 +96,50 @@ def run(
         visualizer.run_demo(data)
     else:
         visualizer.render_vad(vad_stream, fallback_audio=data)
+
+    asr_partials: list[str] = []
+    asr_finals: list[AsrEvent] = []
+    asr_confidence: list[float] = []
+
+    try:
+        asr_engine = create_asr_engine(profile.asr)
+    except RuntimeError as exc:
+        _LOG.warning(
+            "[Continuous skepticism (Sherlock Protocol)] Falling back to visualiser-only mode",
+            extra={
+                "classname": "CLI",
+                "function": "run",
+                "system_section": "asr",
+                "error": str(exc),
+                "structured_message": "ASR backend unavailable",
+            },
+        )
+    else:
+        asr_engine.on_partial(lambda event: asr_partials.append(event.text))
+        asr_engine.on_final(asr_finals.append)
+        asr_engine.on_confidence(lambda value: asr_confidence.append(value))
+        audio_bytes = [np.ascontiguousarray(data, dtype=np.float32).reshape(-1).tobytes()]
+        try:
+            asr_engine.transcribe(audio_bytes)
+        except Exception as exc:  # pragma: no cover - backend specific failures
+            _LOG.error(
+                "[Continuous skepticism (Sherlock Protocol)] Check ASR backend configuration",
+                extra={
+                    "classname": "CLI",
+                    "function": "run",
+                    "system_section": "asr",
+                    "error": str(exc),
+                    "structured_message": "ASR transcription failed",
+                },
+            )
+        else:
+            if asr_partials:
+                visualizer.render_partial(asr_partials)
+            if asr_finals:
+                typer.echo(f"Final transcript: {asr_finals[-1].text}")
+            if asr_confidence:
+                typer.echo(f"Language confidence: {asr_confidence[-1]:.2f}")
+
     typer.echo("Loopback complete")
 
 
