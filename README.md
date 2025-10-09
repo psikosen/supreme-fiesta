@@ -12,6 +12,8 @@ A cross-platform (Linux + macOS) voice agent runtime that orchestrates audio I/O
 - Kitten TTS integration with ONNXRuntime fallback, voice inventory tooling, and CLI preview playback.
 - Model fetcher with resumable downloads, bootstrap script for Linux/macOS, and placeholder benchmarking commands.
 - llama.cpp GGUF streaming runner with CLI streaming benchmark tooling.
+- Smart-Turn v2 orchestrator coordinating VAD, ASR, LLM, and TTS with structured telemetry spans.
+- Latency benchmarking suite covering audio loopback, ASR, LLM, and TTS backends with JSON output.
 
 ## Getting Started
 
@@ -48,7 +50,7 @@ Common commands:
 - `poetry run voice-agent tts sample --voice kitten/en_female_01 "Hello there"` — play a sample clip.
 - `poetry run voice-agent models pull tts/kitten-nano-0.2` — fetch Kitten TTS model assets.
 - `poetry run voice-agent bench llm "Hello"` — stream llama.cpp tokens for a quick sanity check.
-- `poetry run voice-agent bench latency` — measure loopback latency.
+- `poetry run voice-agent bench latency` — emit JSON latency metrics for audio, ASR, LLM, and TTS.
 
 ### Configuration
 
