@@ -34,6 +34,20 @@ Use the provided script to set up dependencies and fetch baseline models (LFM2-3
 
 The script installs Poetry if missing, configures the environment, and downloads the smallest GGUF along with Kitten TTS Nano 0.2.
 
+### Start Build Automation
+
+End-to-end build and validation scripts are available for both Linux and macOS. They ensure required system dependencies are present, install Poetry extras, run the test suite, lint the project, and produce Poetry distribution artifacts.
+
+```bash
+# Linux
+./scripts/start_build_linux.sh
+
+# macOS
+./scripts/start_build_macos.sh
+```
+
+Both scripts accept `SKIP_SYSTEM_DEPS=1` to bypass package manager checks if PortAudio headers are already installed. Set the `PYTHON` environment variable to point at a specific Python 3.11+ interpreter when needed. Override `POETRY_EXTRAS` (defaults to `"tts asr audio"`) to trim optional dependencies when GPU-heavy wheels are unnecessary.
+
 ### CLI Usage
 
 ```

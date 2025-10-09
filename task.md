@@ -12,3 +12,5 @@
 - [x] Implement Smart-Turn v2 orchestration and unit tests.
 - [x] Build benchmarking tools for LLM, ASR, and TTS latency.
 - [x] Extend packaging and telemetry features.
+- [x] Add platform-specific start build scripts with validation and packaging.
+- [x] Document the start build workflow in project docs.
