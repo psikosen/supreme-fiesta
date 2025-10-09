@@ -11,6 +11,7 @@ A cross-platform (Linux + macOS) voice agent runtime that orchestrates audio I/O
 - Terminal dots visualizer showing VAD states, ASR partials, and simulated LLM token flow.
 - Kitten TTS integration with ONNXRuntime fallback, voice inventory tooling, and CLI preview playback.
 - Model fetcher with resumable downloads, bootstrap script for Linux/macOS, and placeholder benchmarking commands.
+- llama.cpp GGUF streaming runner with CLI streaming benchmark tooling.
 
 ## Getting Started
 
@@ -46,6 +47,7 @@ Common commands:
 - `poetry run voice-agent tts list` — list available Kitten voices (requires assets present).
 - `poetry run voice-agent tts sample --voice kitten/en_female_01 "Hello there"` — play a sample clip.
 - `poetry run voice-agent models pull tts/kitten-nano-0.2` — fetch Kitten TTS model assets.
+- `poetry run voice-agent bench llm "Hello"` — stream llama.cpp tokens for a quick sanity check.
 - `poetry run voice-agent bench latency` — measure loopback latency.
 
 ### Configuration

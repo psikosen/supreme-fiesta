@@ -16,6 +16,7 @@ from voice_agent.asr import AsrEvent, create_asr_engine
 from voice_agent.audio import AudioIO
 from voice_agent.cli.visualizer import DotsVisualizer
 from voice_agent.config import ConfigManager
+from voice_agent.llm import LlmConfig as RuntimeLlmConfig, create_llm_engine
 from voice_agent.logging import configure_logging, get_logger
 from voice_agent.tts import KittenTTS, load_voice_inventory
 from voice_agent.vad import SileroVadError, SileroVadStream
@@ -141,6 +142,59 @@ def run(
                 typer.echo(f"Language confidence: {asr_confidence[-1]:.2f}")
 
     typer.echo("Loopback complete")
+
+
+@bench_app.command("llm")
+def bench_llm(
+    prompt: str = typer.Argument("Hello there", help="Prompt to send to the LLM"),
+    max_tokens: int = typer.Option(128, help="Maximum tokens to request from the backend"),
+    config_path: Optional[Path] = typer.Option(None, "--config-path", help="Override configuration path"),
+) -> None:
+    """Stream tokens from the configured llama.cpp backend."""
+
+    manager = _config_manager(config_path)
+    profile = manager.load().active()
+    runtime_config = RuntimeLlmConfig(
+        model_path=profile.llm.model_path,
+        temperature=profile.llm.temperature,
+        top_p=profile.llm.top_p,
+        repeat_penalty=profile.llm.repeat_penalty,
+        context_window=profile.llm.context_window,
+    )
+
+    try:
+        engine = create_llm_engine(runtime_config)
+    except FileNotFoundError as exc:
+        _LOG.error(
+            "[Continuous skepticism (Sherlock Protocol)] LLM model missing",
+            extra={
+                "classname": "CLI",
+                "function": "bench_llm",
+                "system_section": "llm",
+                "error": str(exc),
+                "structured_message": "Run voice-agent models pull to download",
+            },
+        )
+        raise typer.BadParameter(str(exc)) from exc
+
+    typer.echo("Streaming completion...\n")
+    try:
+        for chunk in engine.stream(prompt=prompt, max_tokens=max_tokens):
+            typer.echo(chunk, nl=False)
+    except RuntimeError as exc:
+        _LOG.error(
+            "[Continuous skepticism (Sherlock Protocol)] LLM streaming failed",
+            extra={
+                "classname": "CLI",
+                "function": "bench_llm",
+                "system_section": "llm",
+                "error": str(exc),
+                "structured_message": "Inspect llama.cpp configuration",
+            },
+        )
+        raise typer.Exit(code=1) from exc
+    else:
+        typer.echo("\n\nStream complete")
 
 
 @app.command("audio-devices")
