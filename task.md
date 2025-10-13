@@ -16,3 +16,6 @@
 - [x] Document the start build workflow in project docs.
 - [x] Improve `voice-agent models pull` destination handling for Typer 0.9 compatibility.
 - [x] Pin Click dependency to <8.2 to restore CLI help output.
+- [x] Prevent CLI VAD fallback logging from overwriting reserved LogRecord fields.
+- [x] Emit derived Sherlock prompt lines from the structured formatter output.
+- [x] Add regression coverage for CLI run VAD fallback and structured logging output.

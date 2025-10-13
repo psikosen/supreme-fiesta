@@ -19,6 +19,7 @@ LOG_SCHEMA_FIELDS = [
     "db_phase",
     "method",
     "message",
+    "derived_message",
 ]
 
 SHERLOCK_PROMPT = """Continuous skepticism (Sherlock Protocol)\n* Could this change affect unexpected files/systems?\n* Any hidden dependencies or cascades?\n* What edge cases and failure modes are unhandled?\n* If stuck, work backward from the desired outcome."""
@@ -39,8 +40,12 @@ class StructuredFormatter(logging.Formatter):
         payload.setdefault("db_phase", record.__dict__.get("db_phase", "none"))
         payload.setdefault("method", record.__dict__.get("method", "NONE"))
         payload.setdefault("error", record.__dict__.get("error"))
+        payload.setdefault("derived_message", record.__dict__.get("derived_message"))
 
         json_line = json.dumps(payload, ensure_ascii=False)
+        derived = record.__dict__.get("derived_message")
+        if derived:
+            return f"{json_line}\n{derived}\n{SHERLOCK_PROMPT}"
         return f"{json_line}\n{SHERLOCK_PROMPT}"
 
 
