@@ -366,15 +366,15 @@ def models_pull(
     MODEL_MAP = {
         "tts/kitten-nano-0.2": [
             (
-                "https://huggingface.co/kitten-tts/kitten-tts-nano-0.2/resolve/main/kitten_tts_nano_v0_2.onnx",
+                "https://huggingface.co/KittenML/kitten-tts-nano-0.2/blob/main/kitten_tts_nano_v0_2.onnx",
                 "kitten_tts_nano_v0_2.onnx",
             ),
             (
-                "https://huggingface.co/kitten-tts/kitten-tts-nano-0.2/resolve/main/voices.npz",
+                "https://huggingface.co/KittenML/kitten-tts-nano-0.2/blob/main/voices.npz",
                 "voices.npz",
             ),
             (
-                "https://huggingface.co/kitten-tts/kitten-tts-nano-0.2/resolve/main/config.json",
+                "https://huggingface.co/KittenML/kitten-tts-nano-0.2/blob/main/config.json",
                 "config.json",
             ),
         ],
