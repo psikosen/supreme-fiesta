@@ -54,6 +54,7 @@ class FasterWhisperEngine(AsrEngine):
                     "system_section": "asr",
                     "error": error_message,
                     "structured_message": "Run voice-agent models pull asr/faster-whisper-base",
+                    "derived_message": "[Continuous skepticism (Sherlock Protocol)] Investigate missing Faster-Whisper assets",
                 },
             )
             raise RuntimeError(f"{error_message}. Run voice-agent models pull asr/faster-whisper-base")

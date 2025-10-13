@@ -60,6 +60,12 @@ def run(
     seconds: float = typer.Option(3.0, help="Number of seconds to record"),
     input_device: Optional[str] = typer.Option(None, help="Input device name or index"),
     output_device: Optional[str] = typer.Option(None, help="Output device name or index"),
+    turns: int = typer.Option(
+        0,
+        "--turns",
+        min=0,
+        help="Number of turns to run (0 for continuous until interrupted)",
+    ),
 ) -> None:
     """Run an audio loopback demo with the dot visualizer."""
 
@@ -67,89 +73,107 @@ def run(
     config = manager.load()
     audio = AudioIO(samplerate=16000)
     visualizer = DotsVisualizer()
-    data = audio.record_loopback(seconds=seconds, input_device=input_device, output_device=output_device)
     profile = config.active()
     vad_model_path = profile.vad.model_path.expanduser()
-    try:
-        vad_stream = SileroVadStream.from_numpy(
-            audio=data,
-            model_path=vad_model_path,
-            sample_rate=audio.samplerate,
-            trigger_level=profile.vad.trigger_level,
-            release_level=profile.vad.release_level,
-            sensitivity=profile.vad.sensitivity,
-        )
-    except FileNotFoundError as exc:
-        _LOG.warning(
-            "VAD model missing",
-            extra={
-                "classname": "CLI",
-                "function": "run",
-                "system_section": "vad",
-                "error": str(exc),
-                "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
-            },
-        )
-        visualizer.run_demo(data)
-    except SileroVadError as exc:
-        _LOG.error(
-            "VAD initialisation failed",
-            extra={
-                "classname": "CLI",
-                "function": "run",
-                "system_section": "vad",
-                "error": str(exc),
-                "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
-            },
-        )
-        visualizer.run_demo(data)
-    else:
-        visualizer.render_vad(vad_stream, fallback_audio=data)
-
-    asr_partials: list[str] = []
-    asr_finals: list[AsrEvent] = []
-    asr_confidence: list[float] = []
+    max_turns = None if turns == 0 else turns
+    typer.echo("Starting loopback session. Press Ctrl+C to exit.")
+    completed_turns = 0
 
     try:
-        asr_engine = create_asr_engine(profile.asr)
-    except RuntimeError as exc:
-        _LOG.warning(
-            "[Continuous skepticism (Sherlock Protocol)] Falling back to visualiser-only mode",
-            extra={
-                "classname": "CLI",
-                "function": "run",
-                "system_section": "asr",
-                "error": str(exc),
-                "structured_message": "ASR backend unavailable",
-            },
-        )
-    else:
-        asr_engine.on_partial(lambda event: asr_partials.append(event.text))
-        asr_engine.on_final(asr_finals.append)
-        asr_engine.on_confidence(lambda value: asr_confidence.append(value))
-        audio_bytes = [np.ascontiguousarray(data, dtype=np.float32).reshape(-1).tobytes()]
-        try:
-            asr_engine.transcribe(audio_bytes)
-        except Exception as exc:  # pragma: no cover - backend specific failures
-            _LOG.error(
-                "[Continuous skepticism (Sherlock Protocol)] Check ASR backend configuration",
-                extra={
-                    "classname": "CLI",
-                    "function": "run",
-                    "system_section": "asr",
-                    "error": str(exc),
-                    "structured_message": "ASR transcription failed",
-                },
+        while max_turns is None or completed_turns < max_turns:
+            completed_turns += 1
+            typer.echo(f"\n--- Turn {completed_turns} ---")
+            data = audio.record_loopback(
+                seconds=seconds,
+                input_device=input_device,
+                output_device=output_device,
             )
-        else:
-            if asr_partials:
-                visualizer.render_partial(asr_partials)
-            if asr_finals:
-                typer.echo(f"Final transcript: {asr_finals[-1].text}")
-            if asr_confidence:
-                typer.echo(f"Language confidence: {asr_confidence[-1]:.2f}")
 
-    typer.echo("Loopback complete")
+            try:
+                vad_stream = SileroVadStream.from_numpy(
+                    audio=data,
+                    model_path=vad_model_path,
+                    sample_rate=audio.samplerate,
+                    trigger_level=profile.vad.trigger_level,
+                    release_level=profile.vad.release_level,
+                    sensitivity=profile.vad.sensitivity,
+                )
+            except FileNotFoundError as exc:
+                _LOG.warning(
+                    "VAD model missing",
+                    extra={
+                        "classname": "CLI",
+                        "function": "run",
+                        "system_section": "vad",
+                        "error": str(exc),
+                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                    },
+                )
+                visualizer.run_demo(data)
+            except SileroVadError as exc:
+                _LOG.error(
+                    "VAD initialisation failed",
+                    extra={
+                        "classname": "CLI",
+                        "function": "run",
+                        "system_section": "vad",
+                        "error": str(exc),
+                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                    },
+                )
+                visualizer.run_demo(data)
+            else:
+                visualizer.render_vad(vad_stream, fallback_audio=data)
+
+            try:
+                asr_engine = create_asr_engine(profile.asr)
+            except RuntimeError as exc:
+                _LOG.warning(
+                    "[Continuous skepticism (Sherlock Protocol)] Falling back to visualiser-only mode",
+                    extra={
+                        "classname": "CLI",
+                        "function": "run",
+                        "system_section": "asr",
+                        "error": str(exc),
+                        "structured_message": "ASR backend unavailable",
+                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Investigate ASR backend availability",
+                    },
+                )
+            else:
+                asr_partials: list[str] = []
+                asr_finals: list[AsrEvent] = []
+                asr_confidence: list[float] = []
+
+                asr_engine.on_partial(lambda event: asr_partials.append(event.text))
+                asr_engine.on_final(asr_finals.append)
+                asr_engine.on_confidence(lambda value: asr_confidence.append(value))
+                audio_bytes = [np.ascontiguousarray(data, dtype=np.float32).reshape(-1).tobytes()]
+                try:
+                    asr_engine.transcribe(audio_bytes)
+                except Exception as exc:  # pragma: no cover - backend specific failures
+                    _LOG.error(
+                        "[Continuous skepticism (Sherlock Protocol)] Check ASR backend configuration",
+                        extra={
+                            "classname": "CLI",
+                            "function": "run",
+                            "system_section": "asr",
+                            "error": str(exc),
+                            "structured_message": "ASR transcription failed",
+                        },
+                    )
+                else:
+                    if asr_partials:
+                        visualizer.render_partial(asr_partials)
+                    if asr_finals:
+                        typer.echo(f"Final transcript: {asr_finals[-1].text}")
+                    if asr_confidence:
+                        typer.echo(f"Language confidence: {asr_confidence[-1]:.2f}")
+
+            typer.echo(f"Loopback turn {completed_turns} complete")
+    except KeyboardInterrupt:
+        typer.echo("\nLoopback interrupted by user")
+
+    typer.echo("Loopback session complete")
 
 
 @bench_app.command("llm")

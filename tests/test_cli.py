@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from voice_agent.cli.app import _download_file, app
 from voice_agent.config import ConfigManager
+from voice_agent.asr import AsrEngine, AsrEvent
 
 runner = CliRunner()
 
@@ -130,7 +131,11 @@ def test_models_pull_prefers_option_destination_when_both_provided(tmp_path: Pat
         )
 
     assert result.exit_code == 0
-    assert "Warning: Positional destination ignored because --dest was provided" in result.stderr
+    if result.stderr_bytes is None:
+        warning_output = result.stdout
+    else:
+        warning_output = result.stderr
+    assert "Warning: Positional destination ignored because --dest was provided" in warning_output
     assert {call.args[1] for call in mock_download.call_args_list} == {
         option / "kitten_tts_nano_v0_2.onnx",
         option / "voices.npz",
@@ -159,10 +164,47 @@ def test_run_handles_missing_vad_model(tmp_path: Path) -> None:
     ):
         result = runner.invoke(
             app,
-            ["run"],
+            ["run", "--turns", "1"],
             env={"VOICE_AGENT_CONFIG": str(config_path)},
         )
 
     assert result.exit_code == 0
-    assert "Loopback complete" in result.stdout
+    assert "Loopback turn 1 complete" in result.stdout
+    assert "Loopback session complete" in result.stdout
     assert mock_visualizer.return_value.run_demo.called
+
+
+def test_run_supports_multiple_turns(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    ConfigManager(config_path=config_path)
+
+    dummy_audio = mock.Mock()
+    dummy_audio.samplerate = 16000
+    dummy_audio.record_loopback.side_effect = [
+        np.zeros((160, 1), dtype=np.float32),
+        np.zeros((160, 1), dtype=np.float32),
+    ]
+
+    class DummyAsr(AsrEngine):
+        def transcribe(self, audio_stream):  # type: ignore[override]
+            self.emit_final(AsrEvent(text="hi", timestamp=0.0, confidence=0.5))
+
+    with (
+        mock.patch("voice_agent.cli.app.AudioIO", return_value=dummy_audio),
+        mock.patch("voice_agent.cli.app.SileroVadStream.from_numpy", return_value=["vad"]),
+        mock.patch("voice_agent.cli.app.DotsVisualizer") as mock_visualizer,
+        mock.patch(
+            "voice_agent.cli.app.create_asr_engine",
+            side_effect=[DummyAsr(), DummyAsr()],
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            ["run", "--turns", "2"],
+            env={"VOICE_AGENT_CONFIG": str(config_path)},
+        )
+
+    assert result.exit_code == 0
+    assert dummy_audio.record_loopback.call_count == 2
+    assert result.stdout.count("Loopback turn") == 2
+    assert mock_visualizer.return_value.render_vad.call_count == 2
