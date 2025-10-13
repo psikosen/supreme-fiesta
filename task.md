@@ -20,3 +20,5 @@
 - [x] Emit derived Sherlock prompt lines from the structured formatter output.
 - [x] Add regression coverage for CLI run VAD fallback and structured logging output.
 - [x] Surface actionable error when Faster-Whisper assets are missing.
+- [x] Ensure Sherlock-derived logs include derived metadata for ASR fallbacks.
+- [x] Extend CLI loopback run command to support multi-turn sessions.
