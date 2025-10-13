@@ -19,3 +19,4 @@
 - [x] Prevent CLI VAD fallback logging from overwriting reserved LogRecord fields.
 - [x] Emit derived Sherlock prompt lines from the structured formatter output.
 - [x] Add regression coverage for CLI run VAD fallback and structured logging output.
+- [x] Surface actionable error when Faster-Whisper assets are missing.

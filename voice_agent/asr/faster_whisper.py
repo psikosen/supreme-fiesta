@@ -39,10 +39,29 @@ class FasterWhisperEngine(AsrEngine):
             module = importlib.import_module("faster_whisper")
         WhisperModel = getattr(module, "WhisperModel")
 
+        resolved_path = Path(model_path).expanduser()
+        if not resolved_path.is_absolute():
+            resolved_path = Path.cwd() / resolved_path
+        resolved_path = resolved_path.resolve()
+
+        if not resolved_path.exists():
+            error_message = f"Model missing at {resolved_path}"
+            _LOG.error(
+                "[Continuous skepticism (Sherlock Protocol)] Failed to load Faster-Whisper model",
+                extra={
+                    "classname": self.__class__.__name__,
+                    "function": "__init__",
+                    "system_section": "asr",
+                    "error": error_message,
+                    "structured_message": "Run voice-agent models pull asr/faster-whisper-base",
+                },
+            )
+            raise RuntimeError(f"{error_message}. Run voice-agent models pull asr/faster-whisper-base")
+
         self.language = language
         self.beam_size = beam_size
         compute = compute_type or ("int8" if device == "cpu" else "float16")
-        self._model = WhisperModel(str(model_path), device=device, compute_type=compute)
+        self._model = WhisperModel(str(resolved_path), device=device, compute_type=compute)
 
     def transcribe(self, audio_stream: Iterable[bytes]) -> None:
         audio = stream_to_numpy(audio_stream)
