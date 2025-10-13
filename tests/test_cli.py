@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from voice_agent.cli.app import _download_file, app
 from voice_agent.config import ConfigManager
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
 
 
 def test_profile_list(tmp_path: Path) -> None:
