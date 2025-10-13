@@ -87,7 +87,7 @@ def run(
                 "function": "run",
                 "system_section": "vad",
                 "error": str(exc),
-                "message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
             },
         )
         visualizer.run_demo(data)
@@ -99,7 +99,7 @@ def run(
                 "function": "run",
                 "system_section": "vad",
                 "error": str(exc),
-                "message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
             },
         )
         visualizer.run_demo(data)

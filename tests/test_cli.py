@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from voice_agent.cli.app import _download_file, app
 from voice_agent.config import ConfigManager
 
-runner = CliRunner(mix_stderr=False)
+runner = CliRunner()
 
 
 def test_profile_list(tmp_path: Path) -> None:
@@ -136,3 +136,33 @@ def test_models_pull_prefers_option_destination_when_both_provided(tmp_path: Pat
         option / "voices.npz",
         option / "config.json",
     }
+
+
+def test_run_handles_missing_vad_model(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    ConfigManager(config_path=config_path)
+
+    class DummyAudio:
+        samplerate = 16000
+
+        def record_loopback(self, seconds: float, input_device=None, output_device=None):
+            return np.zeros((160, 1), dtype=np.float32)
+
+    with (
+        mock.patch("voice_agent.cli.app.AudioIO", return_value=DummyAudio()),
+        mock.patch(
+            "voice_agent.cli.app.SileroVadStream.from_numpy",
+            side_effect=FileNotFoundError("missing model"),
+        ),
+        mock.patch("voice_agent.cli.app.DotsVisualizer") as mock_visualizer,
+        mock.patch("voice_agent.cli.app.create_asr_engine", side_effect=RuntimeError("asr disabled")),
+    ):
+        result = runner.invoke(
+            app,
+            ["run"],
+            env={"VOICE_AGENT_CONFIG": str(config_path)},
+        )
+
+    assert result.exit_code == 0
+    assert "Loopback complete" in result.stdout
+    assert mock_visualizer.return_value.run_demo.called
