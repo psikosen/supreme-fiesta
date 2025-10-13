@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -16,7 +17,7 @@ def _audio_chunk() -> bytes:
     return np.ones(1600, dtype=np.float32).tobytes()
 
 
-def test_faster_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_faster_whisper_engine_transcribes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     segments = [
         types.SimpleNamespace(text=" hello", end=0.5, avg_log_prob=np.log(0.9)),
         types.SimpleNamespace(text="world", end=1.0, avg_log_prob=np.log(0.8)),
@@ -33,8 +34,11 @@ def test_faster_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=DummyModel))
 
+    model_file = tmp_path / "model.bin"
+    model_file.write_bytes(b"model")
+
     config = AsrConfig.model_validate(
-        {"asr_backend": "faster-whisper", "asr_model": "model.bin", "asr_device": "cpu"}
+        {"asr_backend": "faster-whisper", "asr_model": str(model_file), "asr_device": "cpu"}
     )
     engine = create_asr_engine(config)
     assert isinstance(engine, FasterWhisperEngine)
@@ -51,6 +55,25 @@ def test_faster_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> N
     assert partials == ["hello", "world"]
     assert finals == ["world"]
     assert confidences == [0.75]
+
+
+def test_faster_whisper_engine_missing_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=object))
+
+    missing = tmp_path / "missing-model"
+    config = AsrConfig.model_validate(
+        {
+            "asr_backend": "faster-whisper",
+            "asr_model": str(missing),
+            "asr_device": "cpu",
+        }
+    )
+
+    with pytest.raises(RuntimeError) as excinfo:
+        create_asr_engine(config)
+
+    assert str(missing.resolve()) in str(excinfo.value)
+    assert "voice-agent models pull" in str(excinfo.value)
 
 
 def test_mlx_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> None:
