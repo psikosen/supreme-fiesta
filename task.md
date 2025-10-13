@@ -14,3 +14,4 @@
 - [x] Extend packaging and telemetry features.
 - [x] Add platform-specific start build scripts with validation and packaging.
 - [x] Document the start build workflow in project docs.
+- [x] Improve `voice-agent models pull` destination handling for Typer 0.9 compatibility.

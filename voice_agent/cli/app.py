@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -277,12 +278,90 @@ def tts_sample(
     })
 
 
-@models_app.command("pull")
+DEFAULT_MODEL_DIR = Path.home() / ".voice-agent" / "models"
+
+
+@models_app.command(
+    "pull",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
 def models_pull(
+    ctx: typer.Context,
     model_id: str = typer.Argument(..., help="Model identifier to download"),
-    destination: Path = typer.Option(Path.home() / ".voice-agent" / "models", "--dest", help="Download directory"),
 ) -> None:
     """Download model assets with resume and checksum validation (simplified)."""
+
+    extra_args = list(ctx.args)
+    positional_destinations: list[Path] = []
+    option_destination: Optional[Path] = None
+
+    idx = 0
+    while idx < len(extra_args):
+        token = extra_args[idx]
+        if token in {"--dest", "-d"}:
+            if idx + 1 >= len(extra_args):
+                typer.echo("Error: --dest requires a value.", err=True)
+                raise typer.Exit(code=2)
+            option_destination = Path(extra_args[idx + 1])
+            idx += 2
+            continue
+        if token.startswith("--dest="):
+            option_destination = Path(token.split("=", 1)[1])
+            idx += 1
+            continue
+        if token.startswith("-d") and token not in {"-d"}:
+            option_destination = Path(token[2:])
+            idx += 1
+            continue
+        positional_destinations.append(Path(token))
+        idx += 1
+
+    destination = (
+        option_destination
+        or (positional_destinations[0] if positional_destinations else DEFAULT_MODEL_DIR)
+    )
+
+    if len(positional_destinations) > 1:
+        _LOG.warning(
+            "Multiple positional destinations provided",
+            extra={
+                "log_filename": __file__,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "classname": "CLI",
+                "function": "models_pull",
+                "system_section": "models",
+                "line_num": 0,
+                "error": None,
+                "db_phase": "none",
+                "method": "NONE",
+                "log_message": "[Continuous skepticism (Sherlock Protocol)] Only the first positional destination will be used",
+            },
+        )
+        typer.echo(
+            "Warning: Multiple positional destinations provided; only the first will be used.",
+            err=True,
+        )
+
+    if option_destination and positional_destinations:
+        _LOG.warning(
+            "Conflicting destination overrides provided",
+            extra={
+                "log_filename": __file__,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "classname": "CLI",
+                "function": "models_pull",
+                "system_section": "models",
+                "line_num": 0,
+                "error": None,
+                "db_phase": "none",
+                "method": "NONE",
+                "log_message": "[Continuous skepticism (Sherlock Protocol)] Positional destination ignored in favour of --dest",
+            },
+        )
+        typer.echo(
+            "Warning: Positional destination ignored because --dest was provided; using --dest value.",
+            err=True,
+        )
 
     MODEL_MAP = {
         "tts/kitten-nano-0.2": [

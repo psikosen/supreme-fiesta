@@ -77,3 +77,62 @@ def test_bench_latency_outputs_metrics(tmp_path: Path) -> None:
     assert "audio_loopback_seconds" in payload
     assert payload["asr"]["latency_ms"] >= 0
     assert payload["llm"]["chunks"] == 1
+
+
+def test_models_pull_accepts_positional_destination(tmp_path: Path) -> None:
+    destination = tmp_path / "models"
+
+    with mock.patch("voice_agent.cli.app._download_file") as mock_download:
+        mock_download.side_effect = lambda url, target: target.write_text("ok")
+        result = runner.invoke(
+            app,
+            ["models", "pull", "tts/kitten-nano-0.2", str(destination)],
+        )
+
+    assert result.exit_code == 0
+    expected_files = {destination / "kitten_tts_nano_v0_2.onnx", destination / "voices.npz", destination / "config.json"}
+    actual_files = {call.args[1] for call in mock_download.call_args_list}
+    assert actual_files == expected_files
+
+
+def test_models_pull_accepts_option_destination(tmp_path: Path) -> None:
+    destination = tmp_path / "from-option"
+
+    with mock.patch("voice_agent.cli.app._download_file") as mock_download:
+        result = runner.invoke(
+            app,
+            ["models", "pull", "tts/kitten-nano-0.2", "--dest", str(destination)],
+        )
+
+    assert result.exit_code == 0
+    assert {call.args[1] for call in mock_download.call_args_list} == {
+        destination / "kitten_tts_nano_v0_2.onnx",
+        destination / "voices.npz",
+        destination / "config.json",
+    }
+
+
+def test_models_pull_prefers_option_destination_when_both_provided(tmp_path: Path) -> None:
+    positional = tmp_path / "positional"
+    option = tmp_path / "option"
+
+    with mock.patch("voice_agent.cli.app._download_file") as mock_download:
+        result = runner.invoke(
+            app,
+            [
+                "models",
+                "pull",
+                "tts/kitten-nano-0.2",
+                str(positional),
+                "--dest",
+                str(option),
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "Warning: Positional destination ignored because --dest was provided" in result.stderr
+    assert {call.args[1] for call in mock_download.call_args_list} == {
+        option / "kitten_tts_nano_v0_2.onnx",
+        option / "voices.npz",
+        option / "config.json",
+    }
