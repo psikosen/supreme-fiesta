@@ -28,3 +28,4 @@
 - [x] Detect and repair incomplete Faster-Whisper asset directories during initialisation.
 - [x] Fix Faster-Whisper download root handling for Hugging Face-managed assets.
 - [x] Surface unsupported llama.cpp GGUF architecture guidance during model load.
+- [x] Switch default llama.cpp profiles to TinyLlama 1.1B Chat GGUF for compatibility.
