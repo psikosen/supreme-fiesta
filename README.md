@@ -5,7 +5,7 @@ A cross-platform (Linux + macOS) voice agent runtime that orchestrates audio I/O
 ## Features
 
 - Python 3.11+ project managed with Poetry and structured `voice_agent` package layout.
-- Structured logging that emits JSON plus the Sherlock Protocol prompts for human review.
+- Structured logging that emits JSON with optional derived guidance lines for human review.
 - Config profiles stored in TOML with validation, asset path checking, and a registry of supported models.
 - Audio loopback demo via PortAudio (`sounddevice`) with device selection flags.
 - Terminal dots visualizer showing VAD states, ASR partials, and simulated LLM token flow.
@@ -71,7 +71,7 @@ poetry run voice-agent --help
 
 Common commands:
 
-- `poetry run voice-agent run --seconds 5` — record and playback a loopback sample with live dots visualizer.
+- `poetry run voice-agent run --seconds 5` — capture a loopback sample, drive Smart-Turn orchestration, and render live dots when models are available.
 - `poetry run voice-agent audio-devices` — list available input/output devices.
 - `poetry run voice-agent profile list` — enumerate configuration profiles.
 - `poetry run voice-agent profile use fast-mlx` — switch to the MLX Whisper profile.

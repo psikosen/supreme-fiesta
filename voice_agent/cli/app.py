@@ -19,12 +19,13 @@ from voice_agent.benchmarks import (
     measure_llm_latency,
     measure_tts_latency,
 )
-from voice_agent.asr import AsrEvent, create_asr_engine
+from voice_agent.asr import create_asr_engine
 from voice_agent.audio import AudioIO
 from voice_agent.cli.visualizer import DotsVisualizer
 from voice_agent.config import ConfigManager
 from voice_agent.llm import LlmConfig as RuntimeLlmConfig, create_llm_engine
 from voice_agent.logging import configure_logging, get_logger
+from voice_agent.runtime import SmartTurnError, SmartTurnOrchestrator
 from voice_agent.telemetry import TelemetryClient
 from voice_agent.tts import KittenTTS, load_voice_inventory
 from voice_agent.vad import SileroVadError, SileroVadStream
@@ -54,6 +55,16 @@ def _config_manager(config_path: Optional[Path]) -> ConfigManager:
     return ConfigManager(config_path=config_path) if config_path else ConfigManager()
 
 
+def _frame_audio(audio: np.ndarray, frame_samples: int) -> list[np.ndarray]:
+    data = np.asarray(audio, dtype=np.float32).reshape(-1)
+    if data.size == 0:
+        return []
+    frames: list[np.ndarray] = []
+    for start in range(0, data.size, frame_samples):
+        frames.append(data[start : start + frame_samples])
+    return frames
+
+
 @app.command()
 def run(
     config_path: Optional[Path] = typer.Option(None, "--config-path", help="Override configuration path"),
@@ -67,17 +78,54 @@ def run(
         help="Number of turns to run (0 for continuous until interrupted)",
     ),
 ) -> None:
-    """Run an audio loopback demo with the dot visualizer."""
+    """Run an audio conversation loop with ASR, LLM, and TTS orchestration."""
 
     manager = _config_manager(config_path)
     config = manager.load()
     audio = AudioIO(samplerate=16000)
     visualizer = DotsVisualizer()
+    telemetry = TelemetryClient()
     profile = config.active()
     vad_model_path = profile.vad.model_path.expanduser()
     max_turns = None if turns == 0 else turns
     typer.echo("Starting loopback session. Press Ctrl+C to exit.")
     completed_turns = 0
+
+    orchestrator: SmartTurnOrchestrator | None = None
+    try:
+        asr_engine = create_asr_engine(profile.asr)
+        runtime_config = RuntimeLlmConfig(
+            model_path=profile.llm.model_path,
+            temperature=profile.llm.temperature,
+            top_p=profile.llm.top_p,
+            repeat_penalty=profile.llm.repeat_penalty,
+            context_window=profile.llm.context_window,
+        )
+        llm_engine = create_llm_engine(runtime_config)
+        tts_engine = KittenTTS(model_dir=profile.tts.model_dir, voice_id=profile.tts.voice_id)
+    except Exception as exc:
+        _LOG.error(
+            "Conversation pipeline initialisation failed",
+            extra={
+                "classname": "CLI",
+                "function": "run",
+                "system_section": "runtime",
+                "error": str(exc),
+                "structured_message": "ASR/LLM/TTS startup failed",
+                "derived_message": "Verify local model assets and configuration paths",
+            },
+        )
+        typer.echo("ASR/LLM/TTS pipeline unavailable; running visualizer-only mode.")
+    else:
+        orchestrator = SmartTurnOrchestrator(
+            asr_engine=asr_engine,
+            llm_engine=llm_engine,
+            tts_engine=tts_engine,
+            turn_config=profile.turn,
+            tts_config=profile.tts,
+            sample_rate=audio.samplerate,
+            telemetry=telemetry,
+        )
 
     try:
         while max_turns is None or completed_turns < max_turns:
@@ -106,10 +154,13 @@ def run(
                         "function": "run",
                         "system_section": "vad",
                         "error": str(exc),
-                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                        "derived_message": "Install Silero VAD assets to enable turn detection",
                     },
                 )
                 visualizer.run_demo(data)
+                typer.echo("Turn processed without VAD; unable to drive conversation flow.")
+                typer.echo(f"Loopback turn {completed_turns} complete")
+                continue
             except SileroVadError as exc:
                 _LOG.error(
                     "VAD initialisation failed",
@@ -118,56 +169,50 @@ def run(
                         "function": "run",
                         "system_section": "vad",
                         "error": str(exc),
-                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                        "derived_message": "Review Silero configuration parameters",
                     },
                 )
                 visualizer.run_demo(data)
-            else:
-                visualizer.render_vad(vad_stream, fallback_audio=data)
+                typer.echo("Turn processed without VAD; unable to drive conversation flow.")
+                typer.echo(f"Loopback turn {completed_turns} complete")
+                continue
 
+            events = list(vad_stream)
+            visualizer.render_vad(events, fallback_audio=data)
+
+            if orchestrator is None:
+                typer.echo("Conversation pipeline unavailable; skipping ASR/LLM/TTS.")
+                typer.echo(f"Loopback turn {completed_turns} complete")
+                continue
+
+            audio_frames = _frame_audio(data, frame_samples=512)
             try:
-                asr_engine = create_asr_engine(profile.asr)
-            except RuntimeError as exc:
+                result = orchestrator.run(audio_frames, events)
+            except SmartTurnError as exc:
                 _LOG.warning(
-                    "[Continuous skepticism (Sherlock Protocol)] Falling back to visualiser-only mode",
+                    "Conversation turn failed",
                     extra={
                         "classname": "CLI",
                         "function": "run",
-                        "system_section": "asr",
+                        "system_section": "runtime",
                         "error": str(exc),
-                        "structured_message": "ASR backend unavailable",
-                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Investigate ASR backend availability",
+                        "structured_message": "Smart-Turn orchestration error",
+                        "derived_message": "Verify audio quality and timing thresholds",
                     },
                 )
+                typer.echo(f"Conversation turn failed: {exc}")
             else:
-                asr_partials: list[str] = []
-                asr_finals: list[AsrEvent] = []
-                asr_confidence: list[float] = []
-
-                asr_engine.on_partial(lambda event: asr_partials.append(event.text))
-                asr_engine.on_final(asr_finals.append)
-                asr_engine.on_confidence(lambda value: asr_confidence.append(value))
-                audio_bytes = [np.ascontiguousarray(data, dtype=np.float32).reshape(-1).tobytes()]
-                try:
-                    asr_engine.transcribe(audio_bytes)
-                except Exception as exc:  # pragma: no cover - backend specific failures
-                    _LOG.error(
-                        "[Continuous skepticism (Sherlock Protocol)] Check ASR backend configuration",
-                        extra={
-                            "classname": "CLI",
-                            "function": "run",
-                            "system_section": "asr",
-                            "error": str(exc),
-                            "structured_message": "ASR transcription failed",
-                        },
-                    )
-                else:
-                    if asr_partials:
-                        visualizer.render_partial(asr_partials)
-                    if asr_finals:
-                        typer.echo(f"Final transcript: {asr_finals[-1].text}")
-                    if asr_confidence:
-                        typer.echo(f"Language confidence: {asr_confidence[-1]:.2f}")
+                if result.partials:
+                    visualizer.render_partial(result.partials)
+                typer.echo(f"Transcript: {result.transcript}")
+                typer.echo(f"Response: {result.response}")
+                if result.confidences:
+                    typer.echo(f"Confidence: {result.confidences[-1]:.2f}")
+                for name, value in sorted(result.metrics.items()):
+                    if name.endswith("latency") or name.endswith("_ms"):
+                        typer.echo(f"{name}: {value:.2f} ms")
+                    else:
+                        typer.echo(f"{name}: {value}")
 
             typer.echo(f"Loopback turn {completed_turns} complete")
     except KeyboardInterrupt:
@@ -198,13 +243,14 @@ def bench_llm(
         engine = create_llm_engine(runtime_config)
     except FileNotFoundError as exc:
         _LOG.error(
-            "[Continuous skepticism (Sherlock Protocol)] LLM model missing",
+            "LLM model missing",
             extra={
                 "classname": "CLI",
                 "function": "bench_llm",
                 "system_section": "llm",
                 "error": str(exc),
                 "structured_message": "Run voice-agent models pull to download",
+                "derived_message": "Download the configured llama.cpp GGUF model before benchmarking",
             },
         )
         raise typer.BadParameter(str(exc)) from exc
@@ -215,13 +261,14 @@ def bench_llm(
             typer.echo(chunk, nl=False)
     except RuntimeError as exc:
         _LOG.error(
-            "[Continuous skepticism (Sherlock Protocol)] LLM streaming failed",
+            "LLM streaming failed",
             extra={
                 "classname": "CLI",
                 "function": "bench_llm",
                 "system_section": "llm",
                 "error": str(exc),
                 "structured_message": "Inspect llama.cpp configuration",
+                "derived_message": "Review llama.cpp logs for sampling issues",
             },
         )
         raise typer.Exit(code=1) from exc
@@ -358,7 +405,7 @@ def models_pull(
                 "error": None,
                 "db_phase": "none",
                 "method": "NONE",
-                "log_message": "[Continuous skepticism (Sherlock Protocol)] Only the first positional destination will be used",
+                "log_message": "Only the first positional destination will be used",
             },
         )
         typer.echo(
@@ -379,7 +426,7 @@ def models_pull(
                 "error": None,
                 "db_phase": "none",
                 "method": "NONE",
-                "log_message": "[Continuous skepticism (Sherlock Protocol)] Positional destination ignored in favour of --dest",
+                "log_message": "Positional destination ignored in favour of --dest",
             },
         )
         typer.echo(
@@ -439,7 +486,8 @@ def bench_latency(
                 "function": "bench_latency",
                 "system_section": "asr",
                 "error": str(exc),
-                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise ASR backend",
+                "structured_message": "Unable to initialise ASR backend",
+                "derived_message": "Confirm ASR model assets are available",
             },
         )
         metrics["asr"] = {"error": str(exc)}
@@ -465,7 +513,8 @@ def bench_latency(
                 "function": "bench_latency",
                 "system_section": "llm",
                 "error": str(exc),
-                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise LLM backend",
+                "structured_message": "Unable to initialise LLM backend",
+                "derived_message": "Ensure llama.cpp configuration is valid",
             },
         )
         metrics["llm"] = {"error": str(exc)}
@@ -483,7 +532,8 @@ def bench_latency(
                 "function": "bench_latency",
                 "system_section": "tts",
                 "error": str(exc),
-                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise TTS backend",
+                "structured_message": "Unable to initialise TTS backend",
+                "derived_message": "Verify Kitten TTS assets are present",
             },
         )
         metrics["tts"] = {"error": str(exc)}

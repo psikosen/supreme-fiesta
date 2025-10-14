@@ -32,13 +32,14 @@ class LlamaCppEngine(LlmEngine):
         model_path = self._config.model_path.expanduser()
         if not model_path.exists():
             _LOG.error(
-                "[Continuous skepticism (Sherlock Protocol)] Failed to load llama.cpp model",
+                "Failed to load llama.cpp model",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "_initialise_model",
                     "system_section": "llm",
                     "error": f"Model missing at {model_path}",
                     "structured_message": "Verify GGUF asset path",
+                    "derived_message": "Ensure llama.cpp model assets are available locally",
                 },
             )
             raise FileNotFoundError(f"Model missing at {model_path}")
@@ -98,13 +99,14 @@ class LlamaCppEngine(LlmEngine):
             iterator: Iterator[Dict[str, object]] = self._model.create_completion(**request_kwargs)
         except Exception as exc:  # pragma: no cover - backend raises varying errors
             _LOG.error(
-                "[Continuous skepticism (Sherlock Protocol)] llama.cpp completion failed",
+                "llama.cpp completion failed",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "stream",
                     "system_section": "llm",
                     "error": str(exc),
                     "structured_message": "Inspect llama.cpp backend logs",
+                    "derived_message": "Review llama.cpp runtime output for additional details",
                 },
             )
             raise RuntimeError("llama.cpp completion failed") from exc

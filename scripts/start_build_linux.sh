@@ -29,9 +29,9 @@ log_event() {
     "$timestamp" "$func_name" "$section" "$line_number" "$error_flag" "$escaped_message"
 }
 
-print_sherlock_prompt() {
+print_quality_prompt() {
   cat <<'PROMPT'
-[Continuous skepticism (Sherlock Protocol)]
+[Quality checklist]
 * Could this change affect unexpected files/systems?
 * Any hidden dependencies or cascades?
 * What edge cases and failure modes are unhandled?
@@ -83,7 +83,7 @@ ensure_system_dependencies() {
 }
 
 main() {
-  print_sherlock_prompt
+  print_quality_prompt
 
   local project_root
   project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

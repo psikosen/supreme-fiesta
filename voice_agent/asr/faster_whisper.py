@@ -47,14 +47,14 @@ class FasterWhisperEngine(AsrEngine):
         if not resolved_path.exists():
             error_message = f"Model missing at {resolved_path}"
             _LOG.error(
-                "[Continuous skepticism (Sherlock Protocol)] Failed to load Faster-Whisper model",
+                "Failed to load Faster-Whisper model",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "__init__",
                     "system_section": "asr",
                     "error": error_message,
                     "structured_message": "Run voice-agent models pull asr/faster-whisper-base",
-                    "derived_message": "[Continuous skepticism (Sherlock Protocol)] Investigate missing Faster-Whisper assets",
+                    "derived_message": "ASR assets missing; run `voice-agent models pull asr/faster-whisper-base`",
                 },
             )
             raise RuntimeError(f"{error_message}. Run voice-agent models pull asr/faster-whisper-base")
@@ -68,18 +68,19 @@ class FasterWhisperEngine(AsrEngine):
         audio = stream_to_numpy(audio_stream)
         if audio.size == 0:
             _LOG.warning(
-                "[Continuous skepticism (Sherlock Protocol)] No frames to process",
+                "No audio frames available for Faster-Whisper",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "transcribe",
                     "system_section": "asr",
                     "structured_message": "Empty audio stream received",
+                    "derived_message": "Check microphone input and retry",
                 },
             )
             return
 
         _LOG.info(
-            "[Continuous skepticism (Sherlock Protocol)] Running inference",
+            "Starting Faster-Whisper transcription",
             extra={
                 "classname": self.__class__.__name__,
                 "function": "transcribe",

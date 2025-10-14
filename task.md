@@ -23,3 +23,5 @@
 - [x] Ensure Sherlock-derived logs include derived metadata for ASR fallbacks.
 - [x] Extend CLI loopback run command to support multi-turn sessions.
 - [x] Add desktop dev shell script with workspace validation for the Tauri frontend.
+- [x] Replace Sherlock Protocol prompts with a neutral quality checklist across logging and scripts.
+- [x] Integrate Smart-Turn orchestration into the CLI run command with ASR/LLM/TTS playback.

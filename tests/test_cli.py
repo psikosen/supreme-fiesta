@@ -8,7 +8,6 @@ from typer.testing import CliRunner
 
 from voice_agent.cli.app import _download_file, app
 from voice_agent.config import ConfigManager
-from voice_agent.asr import AsrEngine, AsrEvent
 
 runner = CliRunner()
 
@@ -169,6 +168,7 @@ def test_run_handles_missing_vad_model(tmp_path: Path) -> None:
         )
 
     assert result.exit_code == 0
+    assert "ASR/LLM/TTS pipeline unavailable" in result.stdout
     assert "Loopback turn 1 complete" in result.stdout
     assert "Loopback session complete" in result.stdout
     assert mock_visualizer.return_value.run_demo.called
@@ -185,19 +185,28 @@ def test_run_supports_multiple_turns(tmp_path: Path) -> None:
         np.zeros((160, 1), dtype=np.float32),
     ]
 
-    class DummyAsr(AsrEngine):
-        def transcribe(self, audio_stream):  # type: ignore[override]
-            self.emit_final(AsrEvent(text="hi", timestamp=0.0, confidence=0.5))
-
     with (
         mock.patch("voice_agent.cli.app.AudioIO", return_value=dummy_audio),
         mock.patch("voice_agent.cli.app.SileroVadStream.from_numpy", return_value=["vad"]),
         mock.patch("voice_agent.cli.app.DotsVisualizer") as mock_visualizer,
-        mock.patch(
-            "voice_agent.cli.app.create_asr_engine",
-            side_effect=[DummyAsr(), DummyAsr()],
-        ),
+        mock.patch("voice_agent.cli.app.create_asr_engine", return_value=mock.Mock()),
+        mock.patch("voice_agent.cli.app.create_llm_engine", return_value=mock.Mock()),
+        mock.patch("voice_agent.cli.app.KittenTTS", return_value=mock.Mock()),
+        mock.patch("voice_agent.cli.app.SmartTurnOrchestrator") as mock_orchestrator_cls,
     ):
+        result_sequence = []
+        for idx in range(2):
+            payload = mock.Mock()
+            payload.transcript = f"hi-{idx}"
+            payload.response = f"response-{idx}"
+            payload.partials = (f"partial-{idx}",)
+            payload.confidences = (0.9,)
+            payload.metrics = {"utterance_ms": 123.0 + idx}
+            result_sequence.append(payload)
+        orchestrator_instance = mock.Mock()
+        orchestrator_instance.run.side_effect = result_sequence
+        mock_orchestrator_cls.return_value = orchestrator_instance
+
         result = runner.invoke(
             app,
             ["run", "--turns", "2"],
@@ -207,4 +216,7 @@ def test_run_supports_multiple_turns(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert dummy_audio.record_loopback.call_count == 2
     assert result.stdout.count("Loopback turn") == 2
+    assert orchestrator_instance.run.call_count == 2
+    assert "Transcript: hi-0" in result.stdout
+    assert "Response: response-1" in result.stdout
     assert mock_visualizer.return_value.render_vad.call_count == 2

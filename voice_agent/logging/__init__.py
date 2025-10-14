@@ -22,11 +22,9 @@ LOG_SCHEMA_FIELDS = [
     "derived_message",
 ]
 
-SHERLOCK_PROMPT = """Continuous skepticism (Sherlock Protocol)\n* Could this change affect unexpected files/systems?\n* Any hidden dependencies or cascades?\n* What edge cases and failure modes are unhandled?\n* If stuck, work backward from the desired outcome."""
-
 
 class StructuredFormatter(logging.Formatter):
-    """Emit structured JSON logs plus the mandated human readable prompt."""
+    """Emit structured JSON logs with optional derived guidance lines."""
 
     def format(self, record: logging.LogRecord) -> str:
         payload: Dict[str, Any] = {field: getattr(record, field, None) for field in LOG_SCHEMA_FIELDS}
@@ -45,8 +43,8 @@ class StructuredFormatter(logging.Formatter):
         json_line = json.dumps(payload, ensure_ascii=False)
         derived = record.__dict__.get("derived_message")
         if derived:
-            return f"{json_line}\n{derived}\n{SHERLOCK_PROMPT}"
-        return f"{json_line}\n{SHERLOCK_PROMPT}"
+            return f"{json_line}\n{derived}"
+        return json_line
 
 
 def configure_logging(level: int = logging.INFO) -> None:
