@@ -7,7 +7,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Iterator, Optional
 
 import numpy as np
 import requests
@@ -19,7 +19,7 @@ from voice_agent.benchmarks import (
     measure_llm_latency,
     measure_tts_latency,
 )
-from voice_agent.asr import AsrEvent, create_asr_engine
+from voice_agent.asr import create_asr_engine
 from voice_agent.audio import AudioIO
 from voice_agent.cli.visualizer import DotsVisualizer
 from voice_agent.config import ConfigManager
@@ -27,7 +27,8 @@ from voice_agent.llm import LlmConfig as RuntimeLlmConfig, create_llm_engine
 from voice_agent.logging import configure_logging, get_logger
 from voice_agent.telemetry import TelemetryClient
 from voice_agent.tts import KittenTTS, load_voice_inventory
-from voice_agent.vad import SileroVadError, SileroVadStream
+from voice_agent.vad import SileroVadError, SileroVadStream, VadEvent, VadState
+from voice_agent.runtime import SmartTurnError, SmartTurnOrchestrator
 
 app = typer.Typer(add_completion=False, help="Cross-platform voice agent runtime")
 profile_app = typer.Typer(help="Manage configuration profiles")
@@ -54,6 +55,102 @@ def _config_manager(config_path: Optional[Path]) -> ConfigManager:
     return ConfigManager(config_path=config_path) if config_path else ConfigManager()
 
 
+class MissingModelError(RuntimeError):
+    """Raised when a required model asset could not be located."""
+
+    def __init__(self, component: str, path: Path, suggestion: str | None = None) -> None:
+        super().__init__(f"{component} assets missing at {path}")
+        self.component = component
+        self.path = path
+        self.suggestion = suggestion
+
+
+class _SmartTurnTtsAdapter:
+    """Adapter that routes Kitten TTS synthesis through the configured audio device."""
+
+    def __init__(self, tts: KittenTTS, output_device: Optional[str]) -> None:
+        self._tts = tts
+        self._output_device = output_device
+
+    def speak(self, text: str, chunk_config: Dict[str, int]) -> None:
+        for chunk in self._tts.synthesize(text, chunk_config):
+            self._tts.audio.playback(chunk, output_device=self._output_device)
+
+
+def _iter_audio_frames(audio: np.ndarray, frame_size: int = 512) -> Iterator[np.ndarray]:
+    """Yield contiguous frames from the recorded audio for Smart-Turn processing."""
+
+    flattened = np.ascontiguousarray(audio, dtype=np.float32).reshape(-1)
+    if flattened.size == 0:
+        return
+    for start in range(0, flattened.size, frame_size):
+        yield flattened[start : start + frame_size]
+
+
+def _fallback_vad_stream(duration_s: float) -> Iterator[VadEvent]:
+    """Return a minimal VAD stream when Silero assets are unavailable."""
+
+    yield VadEvent(state=VadState.SPEECH, confidence=1.0, timestamp=0.0)
+    yield VadEvent(state=VadState.SILENCE, confidence=1.0, timestamp=max(0.0, duration_s))
+
+
+def _create_smart_turn_orchestrator(
+    profile: "ProfileConfig",
+    audio: AudioIO,
+    output_device: Optional[str],
+) -> SmartTurnOrchestrator:
+    """Initialise the Smart-Turn orchestrator for the active profile."""
+
+    telemetry = TelemetryClient()
+
+    try:
+        asr_engine = create_asr_engine(profile.asr)
+    except RuntimeError as exc:
+        raise MissingModelError(
+            "ASR",
+            profile.asr.model_path,
+            suggestion=f"voice-agent models pull asr/{profile.asr.model_path.name}",
+        ) from exc
+
+    runtime_config = RuntimeLlmConfig(
+        model_path=profile.llm.model_path,
+        temperature=profile.llm.temperature,
+        top_p=profile.llm.top_p,
+        repeat_penalty=profile.llm.repeat_penalty,
+        context_window=profile.llm.context_window,
+    )
+
+    try:
+        llm_engine = create_llm_engine(runtime_config)
+    except FileNotFoundError as exc:
+        raise MissingModelError(
+            "LLM",
+            profile.llm.model_path,
+            suggestion=f"voice-agent models pull llm/{profile.llm.model_path.name}",
+        ) from exc
+
+    try:
+        kitten = KittenTTS(profile.tts.model_dir, profile.tts.voice_id)
+    except FileNotFoundError as exc:
+        raise MissingModelError(
+            "TTS",
+            profile.tts.model_dir,
+            suggestion="voice-agent models pull tts/kitten-nano-0.2",
+        ) from exc
+
+    tts_engine = _SmartTurnTtsAdapter(kitten, output_device)
+
+    return SmartTurnOrchestrator(
+        asr_engine=asr_engine,
+        llm_engine=llm_engine,
+        tts_engine=tts_engine,
+        turn_config=profile.turn,
+        tts_config=profile.tts,
+        sample_rate=audio.samplerate,
+        telemetry=telemetry,
+    )
+
+
 @app.command()
 def run(
     config_path: Optional[Path] = typer.Option(None, "--config-path", help="Override configuration path"),
@@ -76,7 +173,25 @@ def run(
     profile = config.active()
     vad_model_path = profile.vad.model_path.expanduser()
     max_turns = None if turns == 0 else turns
-    typer.echo("Starting loopback session. Press Ctrl+C to exit.")
+    try:
+        orchestrator = _create_smart_turn_orchestrator(profile, audio, output_device)
+    except MissingModelError as exc:
+        _LOG.error(
+            "Smart-Turn initialisation failed",
+            extra={
+                "classname": "CLI",
+                "function": "run",
+                "system_section": exc.component.lower(),
+                "error": str(exc),
+                "derived_message": "Quality review: Required runtime assets missing for Smart-Turn",
+            },
+        )
+        typer.echo(f"Error: {exc}")
+        if exc.suggestion:
+            typer.echo(f"Hint: {exc.suggestion}")
+        raise typer.Exit(code=1) from exc
+
+    typer.echo("Starting Smart-Turn session. Press Ctrl+C to exit.")
     completed_turns = 0
 
     try:
@@ -98,6 +213,7 @@ def run(
                     release_level=profile.vad.release_level,
                     sensitivity=profile.vad.sensitivity,
                 )
+                vad_events = list(vad_stream)
             except FileNotFoundError as exc:
                 _LOG.warning(
                     "VAD model missing",
@@ -106,10 +222,10 @@ def run(
                         "function": "run",
                         "system_section": "vad",
                         "error": str(exc),
-                        "derived_message": "Quality review: Silero VAD assets unavailable; switching to RMS visualiser",
+                        "derived_message": "Quality review: Silero VAD assets unavailable; using synthetic VAD stream",
                     },
                 )
-                visualizer.run_demo(data)
+                vad_events = list(_fallback_vad_stream(data.size / float(audio.samplerate)))
             except SileroVadError as exc:
                 _LOG.error(
                     "VAD initialisation failed",
@@ -118,62 +234,47 @@ def run(
                         "function": "run",
                         "system_section": "vad",
                         "error": str(exc),
-                        "derived_message": "Quality review: VAD backend error; reverting to RMS visualiser",
+                        "derived_message": "Quality review: VAD backend error; using synthetic VAD stream",
                     },
                 )
-                visualizer.run_demo(data)
-            else:
-                visualizer.render_vad(vad_stream, fallback_audio=data)
+                vad_events = list(_fallback_vad_stream(data.size / float(audio.samplerate)))
+
+            visualizer.render_vad(vad_events, fallback_audio=data)
 
             try:
-                asr_engine = create_asr_engine(profile.asr)
-            except RuntimeError as exc:
-                _LOG.warning(
-                    "ASR backend unavailable; continuing without transcription",
+                result = orchestrator.run(
+                    audio_frames=_iter_audio_frames(data),
+                    vad_stream=iter(vad_events),
+                )
+            except SmartTurnError as exc:
+                _LOG.error(
+                    "Smart-Turn execution failed",
                     extra={
                         "classname": "CLI",
                         "function": "run",
-                        "system_section": "asr",
+                        "system_section": "smart_turn",
                         "error": str(exc),
-                        "structured_message": "ASR backend unavailable",
-                        "derived_message": "Quality review: Investigate ASR configuration before enabling LLM+TTS turn",
+                        "derived_message": "Quality review: Investigate Smart-Turn orchestration inputs",
                     },
                 )
+                typer.echo(f"Smart-Turn failed: {exc}")
             else:
-                asr_partials: list[str] = []
-                asr_finals: list[AsrEvent] = []
-                asr_confidence: list[float] = []
-
-                asr_engine.on_partial(lambda event: asr_partials.append(event.text))
-                asr_engine.on_final(asr_finals.append)
-                asr_engine.on_confidence(lambda value: asr_confidence.append(value))
-                audio_bytes = [np.ascontiguousarray(data, dtype=np.float32).reshape(-1).tobytes()]
-                try:
-                    asr_engine.transcribe(audio_bytes)
-                except Exception as exc:  # pragma: no cover - backend specific failures
-                    _LOG.error(
-                        "ASR transcription failed",
-                        extra={
-                            "classname": "CLI",
-                            "function": "run",
-                            "system_section": "asr",
-                            "error": str(exc),
-                            "structured_message": "ASR transcription failed",
-                        },
+                typer.echo(f"User transcript: {result.transcript}")
+                typer.echo(f"Assistant response: {result.response}")
+                if result.confidences:
+                    typer.echo(f"ASR confidence: {result.confidences[-1]:.2f}")
+                if result.metrics:
+                    metrics = ", ".join(
+                        f"{name}={value:.1f}ms" if name.endswith("latency") else f"{name}={value}"
+                        for name, value in sorted(result.metrics.items())
                     )
-                else:
-                    if asr_partials:
-                        visualizer.render_partial(asr_partials)
-                    if asr_finals:
-                        typer.echo(f"Final transcript: {asr_finals[-1].text}")
-                    if asr_confidence:
-                        typer.echo(f"Language confidence: {asr_confidence[-1]:.2f}")
+                    typer.echo(f"Turn metrics: {metrics}")
 
             typer.echo(f"Loopback turn {completed_turns} complete")
     except KeyboardInterrupt:
-        typer.echo("\nLoopback interrupted by user")
+        typer.echo("\nSmart-Turn session interrupted by user")
 
-    typer.echo("Loopback session complete")
+    typer.echo("Smart-Turn session complete")
 
 
 @bench_app.command("llm")
