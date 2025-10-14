@@ -122,6 +122,51 @@ def test_faster_whisper_engine_downloads_missing_alias(tmp_path: Path, monkeypat
     assert created["download_options"] == {"download_root": str(target_dir.resolve())}
 
 
+def test_faster_whisper_engine_recovers_incomplete_assets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created: dict[str, object] = {}
+
+    class DummyModel:
+        def __init__(
+            self,
+            model_path: str,
+            device: str,
+            compute_type: str,
+            download_options: dict | None = None,
+        ) -> None:
+            created.update(
+                {
+                    "model_path": model_path,
+                    "device": device,
+                    "compute_type": compute_type,
+                    "download_options": download_options,
+                }
+            )
+
+        def transcribe(self, audio: np.ndarray, language: str, beam_size: int):  # pragma: no cover - not executed
+            raise AssertionError("transcribe should not be invoked in constructor test")
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=DummyModel))
+
+    target_dir = tmp_path / "faster-whisper-base"
+    target_dir.mkdir()
+    (target_dir / "placeholder.txt").write_text("partial download")
+
+    config = AsrConfig.model_validate(
+        {
+            "asr_backend": "faster-whisper",
+            "asr_model": str(target_dir),
+            "asr_device": "cpu",
+        }
+    )
+
+    create_asr_engine(config)
+
+    assert created["model_path"] == "base"
+    assert created["download_options"] == {"download_root": str(target_dir.resolve())}
+
+
 def test_mlx_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyModel:
         def __init__(self, model_path: str, device: str) -> None:  # noqa: ARG002

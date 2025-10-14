@@ -7,7 +7,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterator, Optional, TYPE_CHECKING
 
 import numpy as np
 import requests
@@ -29,6 +29,9 @@ from voice_agent.telemetry import TelemetryClient
 from voice_agent.tts import KittenTTS, load_voice_inventory
 from voice_agent.vad import SileroVadError, SileroVadStream, VadEvent, VadState
 from voice_agent.runtime import SmartTurnError, SmartTurnOrchestrator
+
+if TYPE_CHECKING:
+    from voice_agent.config.models import ProfileConfig
 
 app = typer.Typer(add_completion=False, help="Cross-platform voice agent runtime")
 profile_app = typer.Typer(help="Manage configuration profiles")

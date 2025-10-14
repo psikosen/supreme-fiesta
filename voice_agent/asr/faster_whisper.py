@@ -76,8 +76,9 @@ class FasterWhisperEngine(AsrEngine):
         download_options: Dict[str, str] | None = None
         model_location: str | Path = resolved_path
 
+        pretrained_name = _resolve_pretrained_name(resolved_path)
+
         if not resolved_path.exists():
-            pretrained_name = _resolve_pretrained_name(resolved_path)
             if pretrained_name:
                 resolved_path.mkdir(parents=True, exist_ok=True)
                 download_options = {"download_root": str(resolved_path)}
@@ -115,6 +116,46 @@ class FasterWhisperEngine(AsrEngine):
                 raise RuntimeError(
                     f"{error_message}. Provide a valid Faster-Whisper model path or use a supported alias"
                 )
+        elif resolved_path.is_dir():
+            has_model_binary = any(resolved_path.glob("*.bin"))
+            if not has_model_binary:
+                if pretrained_name:
+                    download_options = {"download_root": str(resolved_path)}
+                    model_location = pretrained_name
+                    _LOG.warning(
+                        "Re-downloading incomplete Faster-Whisper assets",
+                        extra={
+                            "classname": self.__class__.__name__,
+                            "function": "__init__",
+                            "system_section": "asr",
+                            "structured_message": str(
+                                {
+                                    "pretrained": pretrained_name,
+                                    "destination": str(resolved_path),
+                                    "reason": "missing model binaries",
+                                }
+                            ),
+                            "derived_message": "Quality review: Faster-Whisper asset directory incomplete; re-downloading pretrained model",
+                        },
+                    )
+                else:
+                    error_message = (
+                        f"Model assets incomplete at {resolved_path}; expected model binary files"
+                    )
+                    _LOG.error(
+                        "Failed to load Faster-Whisper model",
+                        extra={
+                            "classname": self.__class__.__name__,
+                            "function": "__init__",
+                            "system_section": "asr",
+                            "error": error_message,
+                            "structured_message": "Remove the directory or provide a valid Faster-Whisper model path",
+                            "derived_message": "Quality review: Incomplete ASR assets detected without a known alias",
+                        },
+                    )
+                    raise RuntimeError(
+                        f"{error_message}. Provide a valid Faster-Whisper model path or use a supported alias"
+                    )
 
         try:
             if download_options is not None:
