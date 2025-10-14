@@ -32,7 +32,7 @@ class LlamaCppEngine(LlmEngine):
         model_path = self._config.model_path.expanduser()
         if not model_path.exists():
             _LOG.error(
-                "[Continuous skepticism (Sherlock Protocol)] Failed to load llama.cpp model",
+                "Failed to load llama.cpp model",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "_initialise_model",
@@ -98,7 +98,7 @@ class LlamaCppEngine(LlmEngine):
             iterator: Iterator[Dict[str, object]] = self._model.create_completion(**request_kwargs)
         except Exception as exc:  # pragma: no cover - backend raises varying errors
             _LOG.error(
-                "[Continuous skepticism (Sherlock Protocol)] llama.cpp completion failed",
+                "llama.cpp completion failed",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "stream",

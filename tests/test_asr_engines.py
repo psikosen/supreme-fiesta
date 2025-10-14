@@ -24,8 +24,14 @@ def test_faster_whisper_engine_transcribes(tmp_path: Path, monkeypatch: pytest.M
     ]
 
     class DummyModel:
-        def __init__(self, model_path: str, device: str, compute_type: str) -> None:  # noqa: ARG002
-            self.calls = [(model_path, device, compute_type)]
+        def __init__(
+            self,
+            model_path: str,
+            device: str,
+            compute_type: str,
+            download_options: dict | None = None,
+        ) -> None:  # noqa: ARG002
+            self.calls = [(model_path, device, compute_type, download_options)]
 
         def transcribe(self, audio: np.ndarray, language: str, beam_size: int):  # noqa: ARG002
             assert isinstance(audio, np.ndarray)
@@ -73,7 +79,47 @@ def test_faster_whisper_engine_missing_model(tmp_path: Path, monkeypatch: pytest
         create_asr_engine(config)
 
     assert str(missing.resolve()) in str(excinfo.value)
-    assert "voice-agent models pull" in str(excinfo.value)
+    assert "Provide a valid Faster-Whisper model path" in str(excinfo.value)
+
+
+def test_faster_whisper_engine_downloads_missing_alias(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    created: dict[str, object] = {}
+
+    class DummyModel:
+        def __init__(
+            self,
+            model_path: str,
+            device: str,
+            compute_type: str,
+            download_options: dict | None = None,
+        ) -> None:
+            created.update(
+                {
+                    "model_path": model_path,
+                    "device": device,
+                    "compute_type": compute_type,
+                    "download_options": download_options,
+                }
+            )
+
+        def transcribe(self, audio: np.ndarray, language: str, beam_size: int):  # pragma: no cover - not executed
+            raise AssertionError("transcribe should not be invoked in constructor test")
+
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=DummyModel))
+
+    target_dir = tmp_path / "faster-whisper-base"
+    config = AsrConfig.model_validate(
+        {
+            "asr_backend": "faster-whisper",
+            "asr_model": str(target_dir),
+            "asr_device": "cpu",
+        }
+    )
+
+    create_asr_engine(config)
+
+    assert created["model_path"] == "base"
+    assert created["download_options"] == {"download_root": str(target_dir.resolve())}
 
 
 def test_mlx_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,7 +1,7 @@
 # Project Tasks
 
 - [x] Scaffold Python project with Poetry, pyproject, and package structure.
-- [x] Implement structured logging with Sherlock Protocol prompts.
+- [x] Implement structured logging with quality review prompts.
 - [x] Add configuration management with profiles and asset validation.
 - [x] Provide audio loopback demo with CLI dots visualizer.
 - [x] Integrate Kitten TTS asset handling, voice listing, and playback commands.
@@ -17,9 +17,11 @@
 - [x] Improve `voice-agent models pull` destination handling for Typer 0.9 compatibility.
 - [x] Pin Click dependency to <8.2 to restore CLI help output.
 - [x] Prevent CLI VAD fallback logging from overwriting reserved LogRecord fields.
-- [x] Emit derived Sherlock prompt lines from the structured formatter output.
+- [x] Emit derived quality review prompt lines from the structured formatter output.
 - [x] Add regression coverage for CLI run VAD fallback and structured logging output.
 - [x] Surface actionable error when Faster-Whisper assets are missing.
-- [x] Ensure Sherlock-derived logs include derived metadata for ASR fallbacks.
+- [x] Ensure quality-review derived logs include derived metadata for ASR fallbacks.
+- [x] Add automatic Faster-Whisper model download when configured assets are missing.
+- [x] Replace Sherlock protocol references with the new quality review checklist across tooling.
 - [x] Extend CLI loopback run command to support multi-turn sessions.
 - [x] Add desktop dev shell script with workspace validation for the Tauri frontend.

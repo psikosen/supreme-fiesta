@@ -156,7 +156,7 @@ class SileroVadStream(VadStream):
                     self._state = VadState.SPEECH
                     self._active_frames = 0
                     self._logger.info(
-                        "[Continuous skepticism (Sherlock Protocol)] Speech detected",
+                        "Speech detected",
                         extra={
                             "classname": self.__class__.__name__,
                             "function": "__iter__",
@@ -168,7 +168,7 @@ class SileroVadStream(VadStream):
                     self._state = VadState.SILENCE
                     self._inactive_frames = 0
                     self._logger.info(
-                        "[Continuous skepticism (Sherlock Protocol)] Speech ended",
+                        "Speech ended",
                         extra={
                             "classname": self.__class__.__name__,
                             "function": "__iter__",

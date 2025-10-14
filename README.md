@@ -5,7 +5,7 @@ A cross-platform (Linux + macOS) voice agent runtime that orchestrates audio I/O
 ## Features
 
 - Python 3.11+ project managed with Poetry and structured `voice_agent` package layout.
-- Structured logging that emits JSON plus the Sherlock Protocol prompts for human review.
+- Structured logging that emits JSON plus a quality review checklist for human review.
 - Config profiles stored in TOML with validation, asset path checking, and a registry of supported models.
 - Audio loopback demo via PortAudio (`sounddevice`) with device selection flags.
 - Terminal dots visualizer showing VAD states, ASR partials, and simulated LLM token flow.
