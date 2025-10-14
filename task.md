@@ -22,3 +22,4 @@
 - [x] Surface actionable error when Faster-Whisper assets are missing.
 - [x] Ensure Sherlock-derived logs include derived metadata for ASR fallbacks.
 - [x] Extend CLI loopback run command to support multi-turn sessions.
+- [x] Add desktop dev shell script with workspace validation for the Tauri frontend.

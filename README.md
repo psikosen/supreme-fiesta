@@ -48,6 +48,21 @@ End-to-end build and validation scripts are available for both Linux and macOS. 
 
 Both scripts accept `SKIP_SYSTEM_DEPS=1` to bypass package manager checks if PortAudio headers are already installed. Set the `PYTHON` environment variable to point at a specific Python 3.11+ interpreter when needed. Override `POETRY_EXTRAS` (defaults to `"tts asr audio"`) to trim optional dependencies when GPU-heavy wheels are unnecessary.
 
+### Desktop Dev Shell
+
+The `scripts/start_desktop.sh` helper launches the Tauri desktop workspace and its companion web frontend. It validates the expected directory structure, installs the web dependencies, and proxies arguments to `cargo tauri dev`:
+
+```bash
+./scripts/start_desktop.sh
+```
+
+By default the script expects:
+
+- A Tauri project at `apps/desktop` containing `src-tauri/Cargo.toml`.
+- A web frontend at `apps/web` with a `package.json` file.
+
+Override the locations with `DESKTOP_APP_ROOT` and `DESKTOP_WEB_DIR` if your checkout uses a different layout (for example, when the desktop or web projects live outside the repository root). Install `cargo-tauri` and Node.js + npm before running the script. Set `SKIP_NPM_INSTALL=1` to reuse existing frontend dependencies when you know the `node_modules` tree is already up to date.
+
 ### CLI Usage
 
 ```
