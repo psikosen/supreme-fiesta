@@ -70,3 +70,23 @@ def test_missing_model_raises(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         create_llm_engine(config)
+
+
+def test_unknown_architecture_error(tmp_path: Path, mocker) -> None:
+    model_path = tmp_path / "model.gguf"
+    _write_dummy_model(model_path)
+
+    exc_message = (
+        "Failed to load model from file: assets/llm/LiquidAI/LFM2-350M-GGUF/LFM2-350M-Q4_K_M.gguf"
+        "\nerror loading model architecture: unknown model architecture: 'lfm2'"
+    )
+
+    mock_llama = mocker.Mock(side_effect=ValueError(exc_message))
+
+    config = LlmConfig(model_path=model_path)
+
+    with mock.patch.dict(sys.modules, {"llama_cpp": SimpleNamespace(Llama=mock_llama)}):
+        with pytest.raises(RuntimeError) as excinfo:
+            create_llm_engine(config)
+
+    assert "Unsupported GGUF architecture 'lfm2'" in str(excinfo.value)
