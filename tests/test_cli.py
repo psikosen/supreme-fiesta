@@ -6,9 +6,10 @@ import numpy as np
 
 from typer.testing import CliRunner
 
-from voice_agent.cli.app import _download_file, app
+from voice_agent.cli.app import MissingModelError, _download_file, app
 from voice_agent.config import ConfigManager
-from voice_agent.asr import AsrEngine, AsrEvent
+from voice_agent.runtime import SmartTurnResult
+from voice_agent.vad import VadEvent, VadState
 
 runner = CliRunner()
 
@@ -148,10 +149,30 @@ def test_run_handles_missing_vad_model(tmp_path: Path) -> None:
     ConfigManager(config_path=config_path)
 
     class DummyAudio:
-        samplerate = 16000
+        def __init__(self) -> None:
+            self.samplerate = 16000
 
         def record_loopback(self, seconds: float, input_device=None, output_device=None):
-            return np.zeros((160, 1), dtype=np.float32)
+            return np.zeros((1600, 1), dtype=np.float32)
+
+    class DummyOrchestrator:
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[np.ndarray], list[VadEvent]]] = []
+
+        def run(self, audio_frames, vad_stream):
+            frames = list(audio_frames)
+            events = list(vad_stream)
+            self.calls.append((frames, events))
+            return SmartTurnResult(
+                transcript="hi there",
+                response="hello back",
+                partials=("hi",),
+                confidences=(0.42,),
+                utterance_ms=900.0,
+                metrics={"asr.latency": 12.0},
+            )
+
+    orchestrator = DummyOrchestrator()
 
     with (
         mock.patch("voice_agent.cli.app.AudioIO", return_value=DummyAudio()),
@@ -160,7 +181,10 @@ def test_run_handles_missing_vad_model(tmp_path: Path) -> None:
             side_effect=FileNotFoundError("missing model"),
         ),
         mock.patch("voice_agent.cli.app.DotsVisualizer") as mock_visualizer,
-        mock.patch("voice_agent.cli.app.create_asr_engine", side_effect=RuntimeError("asr disabled")),
+        mock.patch(
+            "voice_agent.cli.app._create_smart_turn_orchestrator",
+            return_value=orchestrator,
+        ),
     ):
         result = runner.invoke(
             app,
@@ -169,9 +193,14 @@ def test_run_handles_missing_vad_model(tmp_path: Path) -> None:
         )
 
     assert result.exit_code == 0
-    assert "Loopback turn 1 complete" in result.stdout
-    assert "Loopback session complete" in result.stdout
-    assert mock_visualizer.return_value.run_demo.called
+    assert "Assistant response: hello back" in result.stdout
+    assert "Smart-Turn session complete" in result.stdout
+    render_vad = mock_visualizer.return_value.render_vad
+    render_vad.assert_called_once()
+    assert len(orchestrator.calls) == 1
+    _, vad_events = orchestrator.calls[0]
+    assert vad_events[0].state is VadState.SPEECH
+    assert vad_events[-1].state is VadState.SILENCE
 
 
 def test_run_supports_multiple_turns(tmp_path: Path) -> None:
@@ -185,19 +214,42 @@ def test_run_supports_multiple_turns(tmp_path: Path) -> None:
         np.zeros((160, 1), dtype=np.float32),
     ]
 
-    class DummyAsr(AsrEngine):
-        def transcribe(self, audio_stream):  # type: ignore[override]
-            self.emit_final(AsrEvent(text="hi", timestamp=0.0, confidence=0.5))
-
     with (
         mock.patch("voice_agent.cli.app.AudioIO", return_value=dummy_audio),
-        mock.patch("voice_agent.cli.app.SileroVadStream.from_numpy", return_value=["vad"]),
-        mock.patch("voice_agent.cli.app.DotsVisualizer") as mock_visualizer,
         mock.patch(
-            "voice_agent.cli.app.create_asr_engine",
-            side_effect=[DummyAsr(), DummyAsr()],
+            "voice_agent.cli.app.SileroVadStream.from_numpy",
+            side_effect=[
+                [
+                    VadEvent(state=VadState.SPEECH, confidence=1.0, timestamp=0.03),
+                    VadEvent(state=VadState.SILENCE, confidence=1.0, timestamp=0.5),
+                ],
+                [
+                    VadEvent(state=VadState.SPEECH, confidence=1.0, timestamp=0.03),
+                    VadEvent(state=VadState.SILENCE, confidence=1.0, timestamp=0.5),
+                ],
+            ],
         ),
+        mock.patch("voice_agent.cli.app.DotsVisualizer") as mock_visualizer,
+        mock.patch("voice_agent.cli.app._create_smart_turn_orchestrator") as mock_orchestrator,
     ):
+        mock_orchestrator.return_value.run.side_effect = [
+            SmartTurnResult(
+                transcript="hello",
+                response="world",
+                partials=("hello",),
+                confidences=(0.7,),
+                utterance_ms=800.0,
+                metrics={},
+            ),
+            SmartTurnResult(
+                transcript="second",
+                response="turn",
+                partials=("second",),
+                confidences=(0.6,),
+                utterance_ms=750.0,
+                metrics={},
+            ),
+        ]
         result = runner.invoke(
             app,
             ["run", "--turns", "2"],
@@ -208,3 +260,37 @@ def test_run_supports_multiple_turns(tmp_path: Path) -> None:
     assert dummy_audio.record_loopback.call_count == 2
     assert result.stdout.count("Loopback turn") == 2
     assert mock_visualizer.return_value.render_vad.call_count == 2
+    assert mock_orchestrator.return_value.run.call_count == 2
+
+
+def test_run_reports_missing_asr_assets(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    ConfigManager(config_path=config_path)
+
+    class DummyAudio:
+        def __init__(self) -> None:
+            self.samplerate = 16000
+
+        def record_loopback(self, seconds: float, input_device=None, output_device=None):
+            return np.zeros((1, 1), dtype=np.float32)
+
+    with (
+        mock.patch("voice_agent.cli.app.AudioIO", return_value=DummyAudio()),
+        mock.patch(
+            "voice_agent.cli.app._create_smart_turn_orchestrator",
+            side_effect=MissingModelError(
+                "ASR",
+                Path("assets/asr/faster-whisper-base"),
+                "voice-agent models pull asr/faster-whisper-base",
+            ),
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            ["run", "--turns", "1"],
+            env={"VOICE_AGENT_CONFIG": str(config_path)},
+        )
+
+    assert result.exit_code == 1
+    assert "Error: ASR assets missing" in result.stdout
+    assert "Hint: voice-agent models pull asr/faster-whisper-base" in result.stdout
