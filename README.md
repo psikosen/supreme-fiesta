@@ -26,7 +26,7 @@ A cross-platform (Linux + macOS) voice agent runtime that orchestrates audio I/O
 
 ### Bootstrap
 
-Use the provided script to set up dependencies and fetch baseline models (LFM2-350M + Kitten TTS assets):
+Use the provided script to set up dependencies and fetch baseline models (TinyLlama 1.1B Chat + Kitten TTS assets):
 
 ```bash
 ./scripts/bootstrap.sh
@@ -98,4 +98,4 @@ See [task.md](task.md) for the tracked epics and outstanding work (Silero VAD, W
 
 ## Licensing
 
-This project is distributed under the Apache-2.0 license. Third-party model licenses (LiquidAI LFM2 GGUF, Kitten TTS Nano 0.2) must be reviewed before redistribution.
+This project is distributed under the Apache-2.0 license. Third-party model licenses (TinyLlama 1.1B Chat GGUF, Kitten TTS Nano 0.2) must be reviewed before redistribution.

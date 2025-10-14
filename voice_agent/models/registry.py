@@ -20,19 +20,12 @@ class ModelEntry:
 
 
 MODEL_REGISTRY: Dict[str, ModelEntry] = {
-    "llm/LiquidAI/LFM2-350M-GGUF": ModelEntry(
-        model_id="llm/LiquidAI/LFM2-350M-GGUF",
-        filename="LFM2-350M-Q4_K_M.gguf",
-        size_mb=356.7,
-        sha256="placeholder-sha256-350m",
-        description="LiquidAI LFM2 350M quantized GGUF",
-    ),
-    "llm/LiquidAI/LFM2-700M-GGUF": ModelEntry(
-        model_id="llm/LiquidAI/LFM2-700M-GGUF",
-        filename="LFM2-700M-Q4_K_M.gguf",
-        size_mb=702.1,
-        sha256="placeholder-sha256-700m",
-        description="LiquidAI LFM2 700M quantized GGUF",
+    "llm/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF": ModelEntry(
+        model_id="llm/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+        filename="tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+        size_mb=637.9,
+        sha256="placeholder-sha256-tinyllama-q4km",
+        description="TinyLlama 1.1B Chat Q4_K_M quantized GGUF",
     ),
     "tts/kitten-nano-0.2/onnx": ModelEntry(
         model_id="tts/kitten-nano-0.2/onnx",

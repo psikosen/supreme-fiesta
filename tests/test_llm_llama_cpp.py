@@ -77,8 +77,8 @@ def test_unknown_architecture_error(tmp_path: Path, mocker) -> None:
     _write_dummy_model(model_path)
 
     exc_message = (
-        "Failed to load model from file: assets/llm/LiquidAI/LFM2-350M-GGUF/LFM2-350M-Q4_K_M.gguf"
-        "\nerror loading model architecture: unknown model architecture: 'lfm2'"
+        "Failed to load model from file: assets/llm/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/"
+        "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf\nerror loading model architecture: unknown model architecture: 'lfm2'"
     )
 
     mock_llama = mocker.Mock(side_effect=ValueError(exc_message))
