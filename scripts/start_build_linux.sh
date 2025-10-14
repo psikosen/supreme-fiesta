@@ -29,13 +29,13 @@ log_event() {
     "$timestamp" "$func_name" "$section" "$line_number" "$error_flag" "$escaped_message"
 }
 
-print_sherlock_prompt() {
+print_review_prompt() {
   cat <<'PROMPT'
-[Continuous skepticism (Sherlock Protocol)]
-* Could this change affect unexpected files/systems?
-* Any hidden dependencies or cascades?
-* What edge cases and failure modes are unhandled?
-* If stuck, work backward from the desired outcome.
+Quality review checklist
+* Did we change only the systems we intended to touch?
+* Are all dependencies accounted for without hidden couplings?
+* Which edge cases or failure modes still need coverage?
+* If blocked, what outcome are we working backward from?
 PROMPT
 }
 
@@ -83,7 +83,7 @@ ensure_system_dependencies() {
 }
 
 main() {
-  print_sherlock_prompt
+  print_review_prompt
 
   local project_root
   project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

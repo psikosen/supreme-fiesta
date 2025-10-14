@@ -22,7 +22,7 @@ LOG_SCHEMA_FIELDS = [
     "derived_message",
 ]
 
-SHERLOCK_PROMPT = """Continuous skepticism (Sherlock Protocol)\n* Could this change affect unexpected files/systems?\n* Any hidden dependencies or cascades?\n* What edge cases and failure modes are unhandled?\n* If stuck, work backward from the desired outcome."""
+REVIEW_PROMPT = """Quality review checklist\n* Did we change only the systems we intended to touch?\n* Are all dependencies accounted for without hidden couplings?\n* Which edge cases or failure modes still need coverage?\n* If blocked, what outcome are we working backward from?"""
 
 
 class StructuredFormatter(logging.Formatter):
@@ -45,8 +45,8 @@ class StructuredFormatter(logging.Formatter):
         json_line = json.dumps(payload, ensure_ascii=False)
         derived = record.__dict__.get("derived_message")
         if derived:
-            return f"{json_line}\n{derived}\n{SHERLOCK_PROMPT}"
-        return f"{json_line}\n{SHERLOCK_PROMPT}"
+            return f"{json_line}\n{derived}\n{REVIEW_PROMPT}"
+        return f"{json_line}\n{REVIEW_PROMPT}"
 
 
 def configure_logging(level: int = logging.INFO) -> None:

@@ -74,7 +74,7 @@ class MlxWhisperEngine(AsrEngine):
         audio = stream_to_numpy(audio_stream)
         if audio.size == 0:
             _LOG.warning(
-                "[Continuous skepticism (Sherlock Protocol)] No frames to process",
+                "No audio frames to process",
                 extra={
                     "classname": self.__class__.__name__,
                     "function": "transcribe",
@@ -86,7 +86,7 @@ class MlxWhisperEngine(AsrEngine):
 
         audio = np.ascontiguousarray(audio, dtype=np.float32)
         _LOG.info(
-            "[Continuous skepticism (Sherlock Protocol)] Running inference",
+            "Running MLX-Whisper inference",
             extra={
                 "classname": self.__class__.__name__,
                 "function": "transcribe",

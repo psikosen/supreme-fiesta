@@ -106,7 +106,7 @@ def run(
                         "function": "run",
                         "system_section": "vad",
                         "error": str(exc),
-                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                        "derived_message": "Quality review: Silero VAD assets unavailable; switching to RMS visualiser",
                     },
                 )
                 visualizer.run_demo(data)
@@ -118,7 +118,7 @@ def run(
                         "function": "run",
                         "system_section": "vad",
                         "error": str(exc),
-                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Falling back to RMS-based visualiser",
+                        "derived_message": "Quality review: VAD backend error; reverting to RMS visualiser",
                     },
                 )
                 visualizer.run_demo(data)
@@ -129,14 +129,14 @@ def run(
                 asr_engine = create_asr_engine(profile.asr)
             except RuntimeError as exc:
                 _LOG.warning(
-                    "[Continuous skepticism (Sherlock Protocol)] Falling back to visualiser-only mode",
+                    "ASR backend unavailable; continuing without transcription",
                     extra={
                         "classname": "CLI",
                         "function": "run",
                         "system_section": "asr",
                         "error": str(exc),
                         "structured_message": "ASR backend unavailable",
-                        "derived_message": "[Continuous skepticism (Sherlock Protocol)] Investigate ASR backend availability",
+                        "derived_message": "Quality review: Investigate ASR configuration before enabling LLM+TTS turn",
                     },
                 )
             else:
@@ -152,7 +152,7 @@ def run(
                     asr_engine.transcribe(audio_bytes)
                 except Exception as exc:  # pragma: no cover - backend specific failures
                     _LOG.error(
-                        "[Continuous skepticism (Sherlock Protocol)] Check ASR backend configuration",
+                        "ASR transcription failed",
                         extra={
                             "classname": "CLI",
                             "function": "run",
@@ -198,7 +198,7 @@ def bench_llm(
         engine = create_llm_engine(runtime_config)
     except FileNotFoundError as exc:
         _LOG.error(
-            "[Continuous skepticism (Sherlock Protocol)] LLM model missing",
+            "LLM model missing",
             extra={
                 "classname": "CLI",
                 "function": "bench_llm",
@@ -215,7 +215,7 @@ def bench_llm(
             typer.echo(chunk, nl=False)
     except RuntimeError as exc:
         _LOG.error(
-            "[Continuous skepticism (Sherlock Protocol)] LLM streaming failed",
+            "LLM streaming failed",
             extra={
                 "classname": "CLI",
                 "function": "bench_llm",
@@ -358,7 +358,7 @@ def models_pull(
                 "error": None,
                 "db_phase": "none",
                 "method": "NONE",
-                "log_message": "[Continuous skepticism (Sherlock Protocol)] Only the first positional destination will be used",
+                "log_message": "Quality review: Only the first positional destination will be used",
             },
         )
         typer.echo(
@@ -379,7 +379,7 @@ def models_pull(
                 "error": None,
                 "db_phase": "none",
                 "method": "NONE",
-                "log_message": "[Continuous skepticism (Sherlock Protocol)] Positional destination ignored in favour of --dest",
+                "log_message": "Quality review: Positional destination ignored in favour of --dest",
             },
         )
         typer.echo(
@@ -439,7 +439,7 @@ def bench_latency(
                 "function": "bench_latency",
                 "system_section": "asr",
                 "error": str(exc),
-                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise ASR backend",
+                "structured_message": "Quality review: Unable to initialise ASR backend",
             },
         )
         metrics["asr"] = {"error": str(exc)}
@@ -465,7 +465,7 @@ def bench_latency(
                 "function": "bench_latency",
                 "system_section": "llm",
                 "error": str(exc),
-                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise LLM backend",
+                "structured_message": "Quality review: Unable to initialise LLM backend",
             },
         )
         metrics["llm"] = {"error": str(exc)}
@@ -483,7 +483,7 @@ def bench_latency(
                 "function": "bench_latency",
                 "system_section": "tts",
                 "error": str(exc),
-                "structured_message": "[Continuous skepticism (Sherlock Protocol)] Unable to initialise TTS backend",
+                "structured_message": "Quality review: Unable to initialise TTS backend",
             },
         )
         metrics["tts"] = {"error": str(exc)}
