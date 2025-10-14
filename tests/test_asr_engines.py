@@ -29,9 +29,9 @@ def test_faster_whisper_engine_transcribes(tmp_path: Path, monkeypatch: pytest.M
             model_path: str,
             device: str,
             compute_type: str,
-            download_options: dict | None = None,
+            download_root: str | None = None,
         ) -> None:  # noqa: ARG002
-            self.calls = [(model_path, device, compute_type, download_options)]
+            self.calls = [(model_path, device, compute_type, download_root)]
 
         def transcribe(self, audio: np.ndarray, language: str, beam_size: int):  # noqa: ARG002
             assert isinstance(audio, np.ndarray)
@@ -91,14 +91,14 @@ def test_faster_whisper_engine_downloads_missing_alias(tmp_path: Path, monkeypat
             model_path: str,
             device: str,
             compute_type: str,
-            download_options: dict | None = None,
+            download_root: str | None = None,
         ) -> None:
             created.update(
                 {
                     "model_path": model_path,
                     "device": device,
                     "compute_type": compute_type,
-                    "download_options": download_options,
+                    "download_root": download_root,
                 }
             )
 
@@ -119,7 +119,7 @@ def test_faster_whisper_engine_downloads_missing_alias(tmp_path: Path, monkeypat
     create_asr_engine(config)
 
     assert created["model_path"] == "base"
-    assert created["download_options"] == {"download_root": str(target_dir.resolve())}
+    assert created["download_root"] == str(target_dir.resolve())
 
 
 def test_faster_whisper_engine_recovers_incomplete_assets(
@@ -133,14 +133,14 @@ def test_faster_whisper_engine_recovers_incomplete_assets(
             model_path: str,
             device: str,
             compute_type: str,
-            download_options: dict | None = None,
+            download_root: str | None = None,
         ) -> None:
             created.update(
                 {
                     "model_path": model_path,
                     "device": device,
                     "compute_type": compute_type,
-                    "download_options": download_options,
+                    "download_root": download_root,
                 }
             )
 
@@ -164,7 +164,7 @@ def test_faster_whisper_engine_recovers_incomplete_assets(
     create_asr_engine(config)
 
     assert created["model_path"] == "base"
-    assert created["download_options"] == {"download_root": str(target_dir.resolve())}
+    assert created["download_root"] == str(target_dir.resolve())
 
 
 def test_mlx_whisper_engine_transcribes(monkeypatch: pytest.MonkeyPatch) -> None:

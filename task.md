@@ -26,3 +26,4 @@
 - [x] Extend CLI loopback run command to support multi-turn sessions.
 - [x] Add desktop dev shell script with workspace validation for the Tauri frontend.
 - [x] Detect and repair incomplete Faster-Whisper asset directories during initialisation.
+- [x] Fix Faster-Whisper download root handling for Hugging Face-managed assets.
