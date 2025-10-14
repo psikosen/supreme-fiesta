@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Dict, Iterable, Iterator
 
 if TYPE_CHECKING:  # pragma: no cover - import used for typing only
@@ -63,7 +64,36 @@ class LlamaCppEngine(LlmEngine):
         )
         from llama_cpp import Llama
 
-        return Llama(**init_kwargs)
+        try:
+            return Llama(**init_kwargs)
+        except ValueError as exc:
+            error_message = str(exc)
+            architecture = _extract_unknown_architecture(error_message)
+            if architecture:
+                guidance = (
+                    f"Unsupported GGUF architecture '{architecture}' detected. "
+                    "Upgrade llama.cpp-python to a build that recognises this architecture "
+                    "or choose a model converted with a supported base architecture."
+                )
+            else:
+                guidance = "llama.cpp failed to load the GGUF model. Verify compatibility."
+
+            derived_message = (
+                "[Continuous skepticism (Sherlock Protocol)] "
+                "Investigate llama.cpp GGUF compatibility failure"
+            )
+            _LOG.error(
+                "Failed to load llama.cpp model",
+                extra={
+                    "classname": self.__class__.__name__,
+                    "function": "_initialise_model",
+                    "system_section": "llm",
+                    "error": error_message,
+                    "structured_message": guidance,
+                    "derived_message": derived_message,
+                },
+            )
+            raise RuntimeError(guidance) from exc
 
     def stream(self, prompt: str, *, max_tokens: int | None = None) -> Iterable[str]:
         sampling = {
@@ -122,3 +152,12 @@ def create_llm_engine(config: LlmConfig) -> LlmEngine:
     """Instantiate an :class:`LlamaCppEngine` for the provided config."""
 
     return LlamaCppEngine(config)
+
+
+def _extract_unknown_architecture(message: str) -> str | None:
+    """Return the architecture referenced in a llama.cpp unknown architecture error."""
+
+    match = re.search(r"unknown model architecture: '([^']+)'", message)
+    if match:
+        return match.group(1)
+    return None
