@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Iterable
 
 import numpy as np
 
@@ -73,7 +73,7 @@ class FasterWhisperEngine(AsrEngine):
         resolved_path = resolved_path.resolve()
 
         compute = compute_type or ("int8" if device == "cpu" else "float16")
-        download_options: Dict[str, str] | None = None
+        download_root: str | None = None
         model_location: str | Path = resolved_path
 
         pretrained_name = _resolve_pretrained_name(resolved_path)
@@ -81,7 +81,7 @@ class FasterWhisperEngine(AsrEngine):
         if not resolved_path.exists():
             if pretrained_name:
                 resolved_path.mkdir(parents=True, exist_ok=True)
-                download_options = {"download_root": str(resolved_path)}
+                download_root = str(resolved_path)
                 model_location = pretrained_name
                 _LOG.info(
                     "Downloading Faster-Whisper model",
@@ -120,7 +120,7 @@ class FasterWhisperEngine(AsrEngine):
             has_model_binary = any(resolved_path.glob("*.bin"))
             if not has_model_binary:
                 if pretrained_name:
-                    download_options = {"download_root": str(resolved_path)}
+                    download_root = str(resolved_path)
                     model_location = pretrained_name
                     _LOG.warning(
                         "Re-downloading incomplete Faster-Whisper assets",
@@ -158,12 +158,12 @@ class FasterWhisperEngine(AsrEngine):
                     )
 
         try:
-            if download_options is not None:
+            if download_root is not None:
                 self._model = WhisperModel(
                     model_location,
                     device=device,
                     compute_type=compute,
-                    download_options=download_options,
+                    download_root=download_root,
                 )
             else:
                 self._model = WhisperModel(str(model_location), device=device, compute_type=compute)
