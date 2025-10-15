@@ -4,6 +4,9 @@
 - [x] Implement compatibility handling or guidance for unsupported GGUF architectures in llama.cpp engine.
 - [x] Verify regression coverage and run project test suite after llama.cpp compatibility fixes.
 
+- [x] Handle optional `huggingface_hub` dependency gaps for automatic GGUF downloads.
+- [x] Add regression coverage for Hugging Face asset helper dependency fallbacks.
+
 - [x] Scaffold Python project with Poetry, pyproject, and package structure.
 - [x] Implement structured logging with quality review prompts.
 - [x] Add configuration management with profiles and asset validation.
