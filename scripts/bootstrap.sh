@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ASSETS_DIR="$PROJECT_ROOT/assets"
-LLM_DIR="$ASSETS_DIR/llm/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF"
+LLM_DIR="$ASSETS_DIR/llm/LiquidAI/LFM2-350M-GGUF"
 TTS_DIR="$ASSETS_DIR/tts/kitten-tts"
 
 python_bin=${PYTHON:-python3}
@@ -20,10 +20,10 @@ poetry install --with dev
 
 mkdir -p "$LLM_DIR" "$TTS_DIR"
 
-LLM_FILE="$LLM_DIR/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+LLM_FILE="$LLM_DIR/LFM2-350M-Q4_K_M.gguf"
 if [ ! -f "$LLM_FILE" ]; then
-  echo "Downloading TinyLlama 1.1B Chat GGUF (Q4_K_M)..."
-  curl -L "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" -o "$LLM_FILE"
+  echo "Downloading LFM2-350M GGUF (Q4_K_M)..."
+  curl -L "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf" -o "$LLM_FILE"
 fi
 
 if [ ! -f "$TTS_DIR/kitten_tts_nano_v0_2.onnx" ]; then
