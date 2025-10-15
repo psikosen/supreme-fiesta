@@ -6,7 +6,7 @@ asr_model = "assets/asr/faster-whisper-base"
 asr_device = "cpu"
 
 llm_backend = "llama-cpp"
-llm_model = "assets/llm/LiquidAI/LFM2-350M-GGUF/LFM2-350M-Q4_K_M.gguf"
+llm_model = "assets/llm/TinyLlama/TinyLlama-1.1B-Chat-v1.0-GGUF/TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf"
 llm_context_window = 2048
 llm_temperature = 0.7
 llm_top_p = 0.9
@@ -36,7 +36,7 @@ asr_model = "assets/asr/mlx-whisper-small"
 asr_device = "mps"
 
 llm_backend = "llama-cpp"
-llm_model = "assets/llm/LiquidAI/LFM2-700M-GGUF/LFM2-700M-Q4_K_M.gguf"
+llm_model = "assets/llm/TheBloke/orca-mini-3b-GGUF/orca-mini-3b.Q4_K_M.gguf"
 llm_context_window = 2048
 llm_temperature = 0.8
 llm_top_p = 0.9

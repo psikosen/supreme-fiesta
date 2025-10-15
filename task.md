@@ -33,3 +33,6 @@
 - [x] Fix Faster-Whisper download root handling for Hugging Face-managed assets.
 - [x] Surface unsupported llama.cpp GGUF architecture guidance during model load.
 - [x] Update llama.cpp dependency to support LiquidAI LFM2 GGUF models without changing defaults.
+- [x] Replace default LLM profiles with a llama.cpp-supported architecture and update assets guidance.
+- [x] Align bootstrap downloads and model registry entries with the new default LLM selection.
+- [x] Run project test suite to confirm configuration updates.
