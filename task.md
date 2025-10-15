@@ -36,3 +36,4 @@
 - [x] Replace default LLM profiles with a llama.cpp-supported architecture and update assets guidance.
 - [x] Align bootstrap downloads and model registry entries with the new default LLM selection.
 - [x] Run project test suite to confirm configuration updates.
+- [x] Implement automatic Hugging Face downloads for missing llama.cpp GGUF assets.

@@ -46,6 +46,28 @@ def test_create_engine_loads_model(tmp_path: Path, mocker) -> None:
     mock_llama.assert_called_once_with(model_path=str(model_path), n_ctx=1024)
 
 
+def test_missing_model_downloads_from_hf(tmp_path: Path, mocker) -> None:
+    model_path = tmp_path / "assets" / "llm" / "Org" / "Repo" / "model.gguf"
+
+    def create_file(path: Path) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_dummy_model(path)
+        return path
+
+    mocker.patch("voice_agent.llm.llama_cpp.ensure_local_gguf", side_effect=create_file)
+
+    mock_llama = mocker.Mock()
+    mock_llama.return_value.create_completion.return_value = iter(())
+
+    config = LlmConfig(model_path=model_path)
+
+    with mock.patch.dict(sys.modules, {"llama_cpp": SimpleNamespace(Llama=mock_llama)}):
+        engine = create_llm_engine(config)
+
+    assert isinstance(engine, LlamaCppEngine)
+    mock_llama.assert_called_once()
+
+
 def test_stream_yields_chunks(tmp_path: Path, mocker) -> None:
     model_path = tmp_path / "model.gguf"
     _write_dummy_model(model_path)
