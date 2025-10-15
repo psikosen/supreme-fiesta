@@ -1,5 +1,9 @@
 # Project Tasks
 
+- [x] Investigate llama.cpp LiquidAI LFM2 model load failure and confirm reproduction steps.
+- [x] Implement compatibility handling or guidance for unsupported GGUF architectures in llama.cpp engine.
+- [x] Verify regression coverage and run project test suite after llama.cpp compatibility fixes.
+
 - [x] Scaffold Python project with Poetry, pyproject, and package structure.
 - [x] Implement structured logging with quality review prompts.
 - [x] Add configuration management with profiles and asset validation.
