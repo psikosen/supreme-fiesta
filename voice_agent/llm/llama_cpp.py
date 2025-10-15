@@ -9,9 +9,17 @@ if TYPE_CHECKING:  # pragma: no cover - import used for typing only
     from llama_cpp import Llama
 
 from voice_agent.llm.base import LlmConfig, LlmEngine
+from voice_agent.llm.gguf_metadata import read_general_architecture
 from voice_agent.logging import get_logger
 
 _LOG = get_logger(__name__)
+
+_ARCHITECTURE_GUIDANCE: dict[str, str] = {
+    "lfm2": (
+        "LiquidAI LFM2 GGUF models require a llama.cpp build with Liquid Fourier Mamba support. "
+        "Install LiquidAI's patched llama.cpp distribution or choose a model converted from a supported architecture."
+    ),
+}
 
 
 class LlamaCppEngine(LlmEngine):
@@ -44,6 +52,8 @@ class LlamaCppEngine(LlmEngine):
             )
             raise FileNotFoundError(f"Model missing at {model_path}")
 
+        metadata_architecture = read_general_architecture(model_path)
+
         init_kwargs: Dict[str, object] = {
             "model_path": str(model_path),
             "n_ctx": self._config.context_window,
@@ -53,13 +63,17 @@ class LlamaCppEngine(LlmEngine):
         if self._n_gpu_layers is not None:
             init_kwargs["n_gpu_layers"] = self._n_gpu_layers
 
+        structured_payload = {k: v for k, v in init_kwargs.items() if k != "model_path"}
+        if metadata_architecture:
+            structured_payload["architecture"] = metadata_architecture
+
         _LOG.info(
             "Initialising llama.cpp",
             extra={
                 "classname": self.__class__.__name__,
                 "function": "_initialise_model",
                 "system_section": "llm",
-                "structured_message": str({k: v for k, v in init_kwargs.items() if k != "model_path"}),
+                "structured_message": str(structured_payload),
             },
         )
         from llama_cpp import Llama
@@ -69,12 +83,16 @@ class LlamaCppEngine(LlmEngine):
         except ValueError as exc:
             error_message = str(exc)
             architecture = _extract_unknown_architecture(error_message)
+            if architecture is None:
+                architecture = metadata_architecture
             if architecture:
-                guidance = (
-                    f"Unsupported GGUF architecture '{architecture}' detected. "
-                    "Upgrade llama-cpp-python to >=0.3.16 (or another build that recognises this architecture) "
-                    "or choose a model converted with a supported base architecture."
-                )
+                guidance = _ARCHITECTURE_GUIDANCE.get(architecture)
+                if guidance is None:
+                    guidance = (
+                        f"Unsupported GGUF architecture '{architecture}' detected. "
+                        "Upgrade llama-cpp-python to a build that recognises this architecture "
+                        "or choose a model converted with a supported base architecture."
+                    )
             else:
                 guidance = "llama.cpp failed to load the GGUF model. Verify compatibility."
 
