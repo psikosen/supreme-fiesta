@@ -10,6 +10,7 @@ if TYPE_CHECKING:  # pragma: no cover - import used for typing only
 
 from voice_agent.llm.base import LlmConfig, LlmEngine
 from voice_agent.llm.gguf_metadata import read_general_architecture
+from voice_agent.llm.hf_assets import ensure_local_gguf
 from voice_agent.logging import get_logger
 
 _LOG = get_logger(__name__)
@@ -38,7 +39,7 @@ class LlamaCppEngine(LlmEngine):
         self._model = self._initialise_model()
 
     def _initialise_model(self) -> "Llama":
-        model_path = self._config.model_path.expanduser()
+        model_path = ensure_local_gguf(self._config.model_path.expanduser())
         if not model_path.exists():
             _LOG.error(
                 "Failed to load llama.cpp model",
