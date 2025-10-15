@@ -28,3 +28,4 @@
 - [x] Detect and repair incomplete Faster-Whisper asset directories during initialisation.
 - [x] Fix Faster-Whisper download root handling for Hugging Face-managed assets.
 - [x] Surface unsupported llama.cpp GGUF architecture guidance during model load.
+- [x] Update llama.cpp dependency to support LiquidAI LFM2 GGUF models without changing defaults.

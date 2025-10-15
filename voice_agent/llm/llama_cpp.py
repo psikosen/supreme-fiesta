@@ -72,7 +72,7 @@ class LlamaCppEngine(LlmEngine):
             if architecture:
                 guidance = (
                     f"Unsupported GGUF architecture '{architecture}' detected. "
-                    "Upgrade llama.cpp-python to a build that recognises this architecture "
+                    "Upgrade llama-cpp-python to >=0.3.16 (or another build that recognises this architecture) "
                     "or choose a model converted with a supported base architecture."
                 )
             else:
