@@ -40,3 +40,4 @@
 - [x] Align bootstrap downloads and model registry entries with the new default LLM selection.
 - [x] Run project test suite to confirm configuration updates.
 - [x] Implement automatic Hugging Face downloads for missing llama.cpp GGUF assets.
+- [x] Migrate configuration validators to Pydantic v2 field_validator decorators to prevent deprecation warnings.

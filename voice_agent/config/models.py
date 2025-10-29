@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Literal
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AsrConfig(BaseModel):
@@ -13,7 +13,7 @@ class AsrConfig(BaseModel):
     model_path: Path = Field(alias="asr_model")
     device: str = Field(alias="asr_device")
 
-    @validator("model_path")
+    @field_validator("model_path")
     def _check_model_path(cls, value: Path) -> Path:
         if not value:
             raise ValueError("ASR model path is required")
@@ -28,7 +28,7 @@ class LlmConfig(BaseModel):
     top_p: float = Field(alias="llm_top_p", ge=0.0, le=1.0)
     repeat_penalty: float = Field(alias="llm_repeat_penalty", ge=0.5, le=2.0)
 
-    @validator("model_path")
+    @field_validator("model_path")
     def _check_llm_path(cls, value: Path) -> Path:
         if not value:
             raise ValueError("LLM model path is required")
@@ -57,7 +57,7 @@ class TtsConfig(BaseModel):
     chunk_min_ms: int
     chunk_max_gap_ms: int
 
-    @validator("model_dir")
+    @field_validator("model_dir")
     def _check_model_dir(cls, value: Path) -> Path:
         if not value:
             raise ValueError("TTS model_dir is required")
